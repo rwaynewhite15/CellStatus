@@ -16,7 +16,7 @@ import MaintenancePage from "@/pages/maintenance";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
-function Router() {
+function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -27,41 +27,23 @@ function Router() {
     );
   }
 
-  return (
-    <Switch>
-      {!isAuthenticated ? (
-        <>
+  // Unauthenticated: show landing page
+  if (!isAuthenticated) {
+    return (
+      <div className="h-screen w-full">
+        <Switch>
           <Route path="/" component={Landing} />
           <Route component={NotFound} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/machines" component={MachinesPage} />
-          <Route path="/operators" component={OperatorsPage} />
-          <Route path="/maintenance" component={MaintenancePage} />
-          <Route component={NotFound} />
-        </>
-      )}
-    </Switch>
-  );
-}
+        </Switch>
+      </div>
+    );
+  }
 
-function AuthenticatedApp() {
-  const { isLoading } = useAuth();
-
+  // Authenticated: show full app with sidebar
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-      </div>
-    );
-  }
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
@@ -84,7 +66,13 @@ function AuthenticatedApp() {
             </div>
           </header>
           <main className="flex-1 overflow-hidden">
-            <Router />
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/machines" component={MachinesPage} />
+              <Route path="/operators" component={OperatorsPage} />
+              <Route path="/maintenance" component={MaintenancePage} />
+              <Route component={NotFound} />
+            </Switch>
           </main>
         </div>
       </div>
@@ -96,7 +84,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthenticatedApp />
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
