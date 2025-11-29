@@ -12,9 +12,12 @@ export const operators = pgTable("operators", {
   name: text("name").notNull(),
   initials: text("initials").notNull(),
   shift: text("shift").notNull(),
+  password: text("password"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
 });
 
-export const insertOperatorSchema = createInsertSchema(operators).omit({ id: true });
+export const insertOperatorSchema = createInsertSchema(operators).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertOperator = z.infer<typeof insertOperatorSchema>;
 export type Operator = typeof operators.$inferSelect;
 
@@ -30,9 +33,13 @@ export const machines = pgTable("machines", {
   cycleTime: real("cycle_time"),
   efficiency: real("efficiency"),
   lastUpdated: text("last_updated"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  createdBy: varchar("created_by"),
+  updatedBy: varchar("updated_by"),
 });
 
-export const insertMachineSchema = createInsertSchema(machines).omit({ id: true });
+export const insertMachineSchema = createInsertSchema(machines).omit({ id: true, createdAt: true, updatedAt: true, createdBy: true, updatedBy: true });
 export type InsertMachine = z.infer<typeof insertMachineSchema>;
 export type Machine = typeof machines.$inferSelect;
 
@@ -47,9 +54,13 @@ export const maintenanceLogs = pgTable("maintenance_logs", {
   completedDate: text("completed_date"),
   technician: text("technician"),
   notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  createdBy: varchar("created_by"),
+  updatedBy: varchar("updated_by"),
 });
 
-export const insertMaintenanceLogSchema = createInsertSchema(maintenanceLogs).omit({ id: true });
+export const insertMaintenanceLogSchema = createInsertSchema(maintenanceLogs).omit({ id: true, createdAt: true, updatedAt: true, createdBy: true, updatedBy: true });
 export type InsertMaintenanceLog = z.infer<typeof insertMaintenanceLogSchema>;
 export type MaintenanceLog = typeof maintenanceLogs.$inferSelect;
 
@@ -63,8 +74,21 @@ export const productionStats = pgTable("production_stats", {
   targetUnits: integer("target_units").notNull(),
   downtime: integer("downtime").default(0),
   efficiency: real("efficiency"),
+  createdAt: text("created_at").notNull(),
+  createdBy: varchar("created_by"),
 });
 
-export const insertProductionStatSchema = createInsertSchema(productionStats).omit({ id: true });
+export const insertProductionStatSchema = createInsertSchema(productionStats).omit({ id: true, createdAt: true, createdBy: true });
 export type InsertProductionStat = z.infer<typeof insertProductionStatSchema>;
 export type ProductionStat = typeof productionStats.$inferSelect;
+
+// Session/Auth
+export const sessions = pgTable("sessions", {
+  id: varchar("id").primaryKey(),
+  operatorId: varchar("operator_id").notNull(),
+  token: text("token").notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
+export type Session = typeof sessions.$inferSelect;

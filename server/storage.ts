@@ -55,12 +55,14 @@ export class MemStorage implements IStorage {
   }
 
   private initializeSampleData() {
+    const now = new Date().toISOString();
+    
     // Sample operators
     const operators: Operator[] = [
-      { id: "op-1", name: "John Smith", initials: "JS", shift: "Day" },
-      { id: "op-2", name: "Maria Garcia", initials: "MG", shift: "Day" },
-      { id: "op-3", name: "Mike Johnson", initials: "MJ", shift: "Swing" },
-      { id: "op-4", name: "Sarah Chen", initials: "SC", shift: "Night" },
+      { id: "op-1", name: "John Smith", initials: "JS", shift: "Day", password: "123456", createdAt: now, updatedAt: now },
+      { id: "op-2", name: "Maria Garcia", initials: "MG", shift: "Day", password: "123456", createdAt: now, updatedAt: now },
+      { id: "op-3", name: "Mike Johnson", initials: "MJ", shift: "Swing", password: "123456", createdAt: now, updatedAt: now },
+      { id: "op-4", name: "Sarah Chen", initials: "SC", shift: "Night", password: "123456", createdAt: now, updatedAt: now },
     ];
     operators.forEach(op => this.operators.set(op.id, op));
 
@@ -76,7 +78,11 @@ export class MemStorage implements IStorage {
         targetUnits: 100,
         cycleTime: 45.2,
         efficiency: 92,
-        lastUpdated: "2 min ago"
+        lastUpdated: "2 min ago",
+        createdAt: now,
+        updatedAt: now,
+        createdBy: "op-1",
+        updatedBy: "op-1"
       },
       { 
         id: "m-2", 
