@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 import Dashboard from "@/pages/dashboard";
 import MachinesPage from "@/pages/machines";
 import OperatorsPage from "@/pages/operators";
@@ -55,6 +57,12 @@ function App() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
+  const handleSignOut = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("operator");
+    window.location.href = "/";
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -70,7 +78,18 @@ function App() {
               <div className="flex flex-col flex-1 min-w-0">
                 <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4">
                   <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  <ThemeToggle />
+                  <div className="flex items-center gap-2">
+                    <ThemeToggle />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={handleSignOut}
+                      title="Sign out"
+                      data-testid="button-sign-out"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </header>
                 <main className="flex-1 overflow-hidden">
                   <Router />
