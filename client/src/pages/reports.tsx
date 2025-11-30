@@ -64,12 +64,14 @@ export default function Reports() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Production Efficiency Report</h1>
-          <p className="text-muted-foreground">Generating efficiency analysis...</p>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="p-4">
+          <h1 className="text-2xl font-bold mb-1">Production Efficiency Report</h1>
+          <p className="text-muted-foreground text-sm">Generating efficiency analysis...</p>
         </div>
-        <Skeleton className="h-96" />
+        <div className="flex-1 px-4 pb-4">
+          <Skeleton className="h-full" />
+        </div>
       </div>
     );
   }
@@ -85,108 +87,115 @@ export default function Reports() {
   })) || [];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Production Efficiency Report</h1>
-          <p className="text-muted-foreground mt-1">
-            Box plots showing efficiency distribution for each machine-operator pair ({reportData?.data?.length || 0} groups)
-          </p>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 border-b p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Production Efficiency Report</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Efficiency distribution for {reportData?.data?.length || 0} machine-operator groups
+            </p>
+          </div>
+          <Button
+            onClick={() => setReportGenerated(false)}
+            variant="outline"
+            size="sm"
+            data-testid="button-new-report"
+          >
+            New Report
+          </Button>
         </div>
-        <Button
-          onClick={() => setReportGenerated(false)}
-          variant="outline"
-          data-testid="button-new-report"
-        >
-          New Report
-        </Button>
       </div>
 
-      {boxPlotChartData.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground">No production data available to generate report</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Efficiency Distribution</CardTitle>
-              <CardDescription>
-                Box plot showing efficiency percentages for each machine-operator pair
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={boxPlotChartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={200} />
-                  <Tooltip
-                    formatter={(value) => {
-                      if (typeof value === "number") {
-                        return value.toFixed(1) + "%";
-                      }
-                      return value;
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="min" fill="#8b5cf6" name="Min" />
-                  <Bar dataKey="q1" fill="#6366f1" name="Q1" />
-                  <Bar dataKey="median" fill="#3b82f6" name="Median" />
-                  <Bar dataKey="q3" fill="#06b6d4" name="Q3" />
-                  <Bar dataKey="max" fill="#10b981" name="Max" />
-                  <Bar dataKey="mean" fill="#f59e0b" name="Mean" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+      <div className="flex-1 overflow-y-auto">
+        {boxPlotChartData.length === 0 ? (
+          <div className="p-4">
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-muted-foreground">No production data available to generate report</p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="p-4 space-y-4">
+            <Card className="flex-shrink-0">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Efficiency Distribution</CardTitle>
+                <CardDescription className="text-xs">
+                  Box plot showing efficiency percentages for each machine-operator pair
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={boxPlotChartData} layout="vertical" margin={{ left: 150, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="name" type="category" width={145} tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(value) => {
+                        if (typeof value === "number") {
+                          return value.toFixed(1) + "%";
+                        }
+                        return value;
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: "16px" }} />
+                    <Bar dataKey="min" fill="#8b5cf6" name="Min" />
+                    <Bar dataKey="q1" fill="#6366f1" name="Q1" />
+                    <Bar dataKey="median" fill="#3b82f6" name="Median" />
+                    <Bar dataKey="q3" fill="#06b6d4" name="Q3" />
+                    <Bar dataKey="max" fill="#10b981" name="Max" />
+                    <Bar dataKey="mean" fill="#f59e0b" name="Mean" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Summary Statistics</CardTitle>
-              <CardDescription>
-                Efficiency metrics for each machine-operator pair
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b">
-                    <tr>
-                      <th className="text-left py-2 px-2">Machine</th>
-                      <th className="text-left py-2 px-2">Operator</th>
-                      <th className="text-right py-2 px-2">Min</th>
-                      <th className="text-right py-2 px-2">Q1</th>
-                      <th className="text-right py-2 px-2">Median</th>
-                      <th className="text-right py-2 px-2">Q3</th>
-                      <th className="text-right py-2 px-2">Max</th>
-                      <th className="text-right py-2 px-2">Mean</th>
-                      <th className="text-right py-2 px-2">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData?.data?.map((item) => (
-                      <tr key={`${item.machineId}-${item.operatorId}`} className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-2">{item.machineName}</td>
-                        <td className="py-2 px-2">{item.operatorName || "Unknown"}</td>
-                        <td className="text-right py-2 px-2">{item.min.toFixed(1)}%</td>
-                        <td className="text-right py-2 px-2">{item.q1.toFixed(1)}%</td>
-                        <td className="text-right py-2 px-2 font-semibold">{item.median.toFixed(1)}%</td>
-                        <td className="text-right py-2 px-2">{item.q3.toFixed(1)}%</td>
-                        <td className="text-right py-2 px-2">{item.max.toFixed(1)}%</td>
-                        <td className="text-right py-2 px-2">{item.mean.toFixed(1)}%</td>
-                        <td className="text-right py-2 px-2">{item.count}</td>
+            <Card className="flex-shrink-0">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Summary Statistics</CardTitle>
+                <CardDescription className="text-xs">
+                  Efficiency metrics for each machine-operator pair
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-xs">
+                    <thead className="border-b sticky top-0 bg-background">
+                      <tr>
+                        <th className="text-left py-1 px-1">Machine</th>
+                        <th className="text-left py-1 px-1">Operator</th>
+                        <th className="text-right py-1 px-1">Min</th>
+                        <th className="text-right py-1 px-1">Q1</th>
+                        <th className="text-right py-1 px-1">Med</th>
+                        <th className="text-right py-1 px-1">Q3</th>
+                        <th className="text-right py-1 px-1">Max</th>
+                        <th className="text-right py-1 px-1">Avg</th>
+                        <th className="text-right py-1 px-1">N</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                    </thead>
+                    <tbody>
+                      {reportData?.data?.map((item) => (
+                        <tr key={`${item.machineId}-${item.operatorId}`} className="border-b hover:bg-muted/50">
+                          <td className="py-1 px-1 truncate">{item.machineName}</td>
+                          <td className="py-1 px-1 truncate">{item.operatorName || "Unknown"}</td>
+                          <td className="text-right py-1 px-1 text-xs tabular-nums">{item.min.toFixed(1)}%</td>
+                          <td className="text-right py-1 px-1 text-xs tabular-nums">{item.q1.toFixed(1)}%</td>
+                          <td className="text-right py-1 px-1 text-xs tabular-nums font-semibold">{item.median.toFixed(1)}%</td>
+                          <td className="text-right py-1 px-1 text-xs tabular-nums">{item.q3.toFixed(1)}%</td>
+                          <td className="text-right py-1 px-1 text-xs tabular-nums">{item.max.toFixed(1)}%</td>
+                          <td className="text-right py-1 px-1 text-xs tabular-nums">{item.mean.toFixed(1)}%</td>
+                          <td className="text-right py-1 px-1">{item.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
