@@ -443,17 +443,6 @@ export async function registerRoutes(
         }
       });
 
-      stats.forEach(s => {
-        if (s.createdBy) {
-          if (!activities.has(s.createdBy)) activities.set(s.createdBy, []);
-          activities.get(s.createdBy)!.push({
-            type: "Recorded Production",
-            target: machineMap.get(s.machineId)?.name || "Unknown",
-            timestamp: s.createdAt,
-            details: `${s.unitsProduced} units produced (Efficiency: ${s.efficiency?.toFixed(1)}%)`
-          });
-        }
-      });
 
       maintenanceLogs.forEach(log => {
         if (log.createdBy) {

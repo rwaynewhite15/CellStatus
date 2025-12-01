@@ -163,9 +163,9 @@ export default function Reports() {
 
             <Card className="flex-shrink-0">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Job Setter Activities</CardTitle>
+                <CardTitle className="text-lg">Activities</CardTitle>
                 <CardDescription className="text-xs">
-                  Recent operator/job setter activities and updates
+                  Recent operator activities and updates
                 </CardDescription>
               </CardHeader>
               <CardContent>
