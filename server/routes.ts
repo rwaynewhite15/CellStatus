@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertMachineSchema, insertOperatorSchema, insertMaintenanceLogSchema, machineStatuses } from "@shared/schema";
+import { insertMachineSchema, insertOperatorSchema, insertMaintenanceLogSchema, machineStatuses, users } from "@shared/schema";
+import { db } from "./db";
 import { z } from "zod";
 
 export async function registerRoutes(
@@ -331,9 +332,7 @@ export async function registerRoutes(
       const maintenanceLogs = await storage.getMaintenanceLogs();
 
       // Get users for authenticated user lookup
-      const db = require('./db').db;
-      const usersTable = require('@shared/schema').users;
-      const allUsers = await db.select().from(usersTable);
+      const allUsers = await db.select().from(users);
       const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
 
       // Create lookup maps
@@ -473,10 +472,27 @@ export async function registerRoutes(
         }));
       }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+      // Build maintenance logs with machine names
+      const maintenanceLogsReport = maintenanceLogs.map(log => ({
+        id: log.id,
+        machineId: log.machineId,
+        machineName: machineMap.get(log.machineId)?.name || "Unknown",
+        type: log.type,
+        description: log.description,
+        status: log.status,
+        scheduledDate: log.scheduledDate,
+        completedDate: log.completedDate,
+        technician: log.technician,
+        notes: log.notes,
+        createdAt: log.createdAt,
+        createdBy: log.createdBy ? (userMap.get(log.createdBy)?.email || userMap.get(log.createdBy)?.firstName || "Unknown") : "System",
+      }));
+
       res.json({ 
         data: reportData,
         machineLogs,
-        jobSetterActivities
+        jobSetterActivities,
+        maintenanceLogs: maintenanceLogsReport
       });
     } catch (error) {
       console.error("Failed to generate efficiency report:", error);

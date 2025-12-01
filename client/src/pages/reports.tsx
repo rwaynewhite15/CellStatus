@@ -28,10 +28,26 @@ interface JobSetterActivity {
   details: string;
 }
 
+interface MaintenanceLog {
+  id: string;
+  machineId: string;
+  machineName: string;
+  type: string;
+  description: string;
+  status: string;
+  scheduledDate: string;
+  completedDate: string;
+  technician: string;
+  notes: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 interface ReportResponse {
   data: any[];
   machineLogs: MachineLog[];
   jobSetterActivities: JobSetterActivity[];
+  maintenanceLogs: MaintenanceLog[];
 }
 
 export default function Reports() {
@@ -144,6 +160,47 @@ export default function Reports() {
                           <td className="py-1 px-1 truncate text-xs">{log.lastUpdatedBy}</td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="flex-shrink-0">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Maintenance Logs</CardTitle>
+                <CardDescription className="text-xs">
+                  Maintenance activities and records
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="w-full text-xs">
+                    <thead className="border-b sticky top-0 bg-background">
+                      <tr>
+                        <th className="text-left py-1 px-1">Machine</th>
+                        <th className="text-left py-1 px-1">Type</th>
+                        <th className="text-left py-1 px-1">Description</th>
+                        <th className="text-left py-1 px-1">Status</th>
+                        <th className="text-left py-1 px-1">Technician</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData?.maintenanceLogs && reportData.maintenanceLogs.length > 0 ? (
+                        reportData.maintenanceLogs.map((log) => (
+                          <tr key={log.id} className="border-b hover:bg-muted/50">
+                            <td className="py-1 px-1 truncate">{log.machineName}</td>
+                            <td className="py-1 px-1 truncate capitalize">{log.type}</td>
+                            <td className="py-1 px-1 truncate">{log.description}</td>
+                            <td className="py-1 px-1 truncate capitalize">{log.status}</td>
+                            <td className="py-1 px-1 truncate">{log.technician}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="py-2 px-1 text-center text-muted-foreground">No maintenance logs</td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
