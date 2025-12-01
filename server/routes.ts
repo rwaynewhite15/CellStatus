@@ -330,6 +330,12 @@ export async function registerRoutes(
       const operators = await storage.getOperators();
       const maintenanceLogs = await storage.getMaintenanceLogs();
 
+      // Get users for authenticated user lookup
+      const db = require('./db').db;
+      const usersTable = require('@shared/schema').users;
+      const allUsers = await db.select().from(usersTable);
+      const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
+
       // Create lookup maps
       const machineMap = new Map(machines.map(m => [m.id, m]));
       const operatorMap = new Map(operators.map(o => [o.id, o]));
@@ -458,8 +464,10 @@ export async function registerRoutes(
 
       const jobSetterActivities = Array.from(activities.entries()).flatMap(([operatorId, ops]) => {
         const operator = operatorMap.get(operatorId);
+        const user = userMap.get(operatorId);
+        const operatorName = operator?.name || user?.email || user?.firstName || "Unknown";
         return ops.map(activity => ({
-          operatorName: operator?.name || "Unknown",
+          operatorName,
           operatorId,
           ...activity
         }));
