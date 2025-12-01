@@ -108,7 +108,7 @@ export default function Reports() {
           <div>
             <h1 className="text-2xl font-bold">Production Efficiency Report</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Efficiency distribution for {reportData?.data?.length || 0} machine-operator groups
+              Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
             </p>
           </div>
           <Button
@@ -141,7 +141,6 @@ export default function Reports() {
                         <th className="text-left py-1 px-1">Operator</th>
                         <th className="text-right py-1 px-1">Units</th>
                         <th className="text-right py-1 px-1">Eff%</th>
-                        <th className="text-left py-1 px-1">Created By</th>
                         <th className="text-left py-1 px-1">Last Updated By</th>
                       </tr>
                     </thead>
@@ -153,7 +152,6 @@ export default function Reports() {
                           <td className="py-1 px-1 truncate">{log.operatorName}</td>
                           <td className="text-right py-1 px-1 tabular-nums">{log.totalUnitsProduced}</td>
                           <td className="text-right py-1 px-1 tabular-nums">{log.avgEfficiency}%</td>
-                          <td className="py-1 px-1 truncate text-xs">{log.createdBy}</td>
                           <td className="py-1 px-1 truncate text-xs">{log.lastUpdatedBy}</td>
                         </tr>
                       ))}
