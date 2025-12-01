@@ -18,6 +18,19 @@ export async function registerRoutes(
   // Get current user endpoint (protected)
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
+      // In local development mode without REPL_ID, return a mock user
+      if (!process.env.REPL_ID) {
+        return res.json({
+          id: 'local-dev-user',
+          email: 'dev@local.host',
+          firstName: 'Local',
+          lastName: 'Developer',
+          profileImageUrl: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
       const userId = req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });

@@ -40,7 +40,9 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsPending(true);
     try {
-      const response = await fetch("/api/auth/login", {
+      const apiBase = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+      const loginUrl = apiBase ? `${apiBase}/api/auth/login` : "/api/auth/login";
+      const response = await fetch(loginUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

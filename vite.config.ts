@@ -4,6 +4,8 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
+  // Set base for GitHub Pages. Replace "/CellStatus/" if your repo name differs.
+  base: "/CellStatus/",
   plugins: [
     react(),
     runtimeErrorOverlay(),
