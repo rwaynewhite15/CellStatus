@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertMachineSchema, insertOperatorSchema, insertMaintenanceLogSchema, insertDowntimeLogSchema, machineStatuses, users, downtimeCategories } from "@shared/schema";
+import { insertMachineSchema, insertOperatorSchema, insertMaintenanceLogSchema, insertDowntimeLogSchema, machineStatuses, users } from "@shared/schema";
 import { db } from "./db";
 import { z } from "zod";
 
