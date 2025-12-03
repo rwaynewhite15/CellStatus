@@ -27,12 +27,17 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
+    title: "Events",
+    url: "/events",
+    icon: LayoutDashboard,
+  },
+  {
     title: "Machines",
     url: "/machines",
     icon: Settings,
   },
   {
-    title: "Operators",
+    title: "Team Members",
     url: "/operators",
     icon: Users,
   },

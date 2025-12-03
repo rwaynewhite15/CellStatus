@@ -10,10 +10,16 @@ import {
   type User,
   type UpsertUser,
   machines, operators, maintenanceLogs, productionStats, users, downtimeLogs,
+  events, eventTasks, eventMembers,
+} from "@shared/schema";
+import type { 
+  Event as EventEntity, InsertEvent as InsertEventEntity,
+  EventTask as EventTaskEntity, InsertEventTask as InsertEventTaskEntity,
+  EventMember as EventMemberEntity, InsertEventMember as InsertEventMemberEntity,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Users (REQUIRED for Replit Auth)
@@ -61,6 +67,22 @@ export interface IStorage {
   createDowntimeLog(log: InsertDowntimeLog): Promise<DowntimeLog>;
   updateDowntimeLog(id: string, updates: Partial<InsertDowntimeLog>): Promise<DowntimeLog | undefined>;
   deleteDowntimeLog(id: string): Promise<boolean>;
+
+  // Events
+  getEvents(): Promise<EventEntity[]>;
+  getEvent(id: string): Promise<EventEntity | undefined>;
+  createEvent(event: InsertEventEntity, createdBy?: string): Promise<EventEntity>;
+  updateEvent(id: string, updates: Partial<InsertEventEntity>): Promise<EventEntity | undefined>;
+  deleteEvent(id: string): Promise<boolean>;
+  // Event Tasks
+  getEventTasks(eventId: string): Promise<EventTaskEntity[]>;
+  createEventTask(task: InsertEventTaskEntity): Promise<EventTaskEntity>;
+  updateEventTask(id: string, updates: Partial<InsertEventTaskEntity>): Promise<EventTaskEntity | undefined>;
+  deleteEventTask(id: string): Promise<boolean>;
+  // Event Members
+  getEventMembers(eventId: string): Promise<EventMemberEntity[]>;
+  addEventMember(member: InsertEventMemberEntity): Promise<EventMemberEntity>;
+  removeEventMember(eventId: string, operatorId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -373,28 +395,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProductionStatsByMachineAndDate(machineId: string, date: string): Promise<number> {
-    const toDelete = await db
-      .select({ id: productionStats.id })
+    // Defensive: fetch and filter in JS to avoid subtle text/date compare issues
+    const allForMachine = await db
+      .select({ id: productionStats.id, date: productionStats.date })
       .from(productionStats)
-      .where(and(eq(productionStats.machineId, machineId), eq(productionStats.date, date)));
+      .where(eq(productionStats.machineId, machineId));
 
-    await db
-      .delete(productionStats)
-      .where(and(eq(productionStats.machineId, machineId), eq(productionStats.date, date)));
+    const idsToDelete = allForMachine.filter(s => s.date === date).map(s => s.id);
+    if (idsToDelete.length === 0) {
+      return 0;
+    }
 
-    return toDelete.length;
+    await db.delete(productionStats).where(inArray(productionStats.id, idsToDelete));
+    return idsToDelete.length;
   }
 
   async deleteProductionStatsByMachineDateShift(machineId: string, date: string, shift: string): Promise<number> {
+      console.log("Storage delete with:", { machineId, date, shift });
     const toDelete = await db
       .select({ id: productionStats.id })
       .from(productionStats)
       .where(and(eq(productionStats.machineId, machineId), eq(productionStats.date, date), eq(productionStats.shift, shift)));
-
+  console.log("Found to delete:", toDelete.length, toDelete);
     await db
       .delete(productionStats)
       .where(and(eq(productionStats.machineId, machineId), eq(productionStats.date, date), eq(productionStats.shift, shift)));
-
+  console.log("Delete completed");
     return toDelete.length;
   }
 
@@ -468,6 +494,128 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDowntimeLog(id: string): Promise<boolean> {
     await db.delete(downtimeLogs).where(eq(downtimeLogs.id, id));
+    return true;
+  }
+
+  // Events
+  async getEvents(): Promise<EventEntity[]> {
+    return await db.select().from(events);
+  }
+
+  async getEvent(id: string): Promise<EventEntity | undefined> {
+    const result = await db.select().from(events).where(eq(events.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createEvent(event: InsertEventEntity, createdBy?: string): Promise<EventEntity> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    await db.insert(events).values({
+      id,
+      title: event.title,
+      description: event.description ?? null,
+      startDate: event.startDate ?? null,
+      endDate: event.endDate ?? null,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: createdBy ?? null,
+    });
+    return (await this.getEvent(id))!;
+  }
+
+  async updateEvent(id: string, updates: Partial<InsertEventEntity>): Promise<EventEntity | undefined> {
+    const ev = await this.getEvent(id);
+    if (!ev) return undefined;
+    const now = new Date().toISOString();
+    await db.update(events)
+      .set({
+        title: updates.title ?? (ev as any).title,
+        description: updates.description !== undefined ? updates.description : (ev as any).description,
+        startDate: updates.startDate ?? (ev as any).startDate,
+        endDate: updates.endDate ?? (ev as any).endDate,
+        updatedAt: now,
+      })
+      .where(eq(events.id, id));
+    return (await this.getEvent(id))!;
+  }
+
+  async deleteEvent(id: string): Promise<boolean> {
+    // Cascade delete tasks and members
+    await db.delete(eventTasks).where(eq(eventTasks.eventId, id));
+    await db.delete(eventMembers).where(eq(eventMembers.eventId, id));
+    await db.delete(events).where(eq(events.id, id));
+    return true;
+  }
+
+  // Event Tasks
+  async getEventTasks(eventId: string): Promise<EventTaskEntity[]> {
+    return await db.select().from(eventTasks).where(eq(eventTasks.eventId, eventId));
+  }
+
+  async createEventTask(task: InsertEventTaskEntity): Promise<EventTaskEntity> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    await db.insert(eventTasks).values({
+      id,
+      eventId: task.eventId,
+      title: task.title,
+      description: task.description ?? null,
+      startDate: task.startDate ?? null,
+      endDate: task.endDate ?? null,
+      status: task.status ?? "pending",
+      assigneeId: task.assigneeId ?? null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const result = await db.select().from(eventTasks).where(eq(eventTasks.id, id)).limit(1);
+    return result[0]!;
+  }
+
+  async updateEventTask(id: string, updates: Partial<InsertEventTaskEntity>): Promise<EventTaskEntity | undefined> {
+    const current = await db.select().from(eventTasks).where(eq(eventTasks.id, id)).limit(1);
+    const task = current[0];
+    if (!task) return undefined;
+    const now = new Date().toISOString();
+    await db.update(eventTasks)
+      .set({
+        title: updates.title ?? task.title,
+        description: updates.description !== undefined ? updates.description : task.description,
+        startDate: updates.startDate ?? task.startDate,
+        endDate: updates.endDate ?? task.endDate,
+        status: updates.status ?? task.status,
+        assigneeId: updates.assigneeId !== undefined ? updates.assigneeId : task.assigneeId,
+        updatedAt: now,
+      })
+      .where(eq(eventTasks.id, id));
+    const result = await db.select().from(eventTasks).where(eq(eventTasks.id, id)).limit(1);
+    return result[0]!;
+  }
+
+  async deleteEventTask(id: string): Promise<boolean> {
+    await db.delete(eventTasks).where(eq(eventTasks.id, id));
+    return true;
+  }
+
+  // Event Members
+  async getEventMembers(eventId: string): Promise<EventMemberEntity[]> {
+    return await db.select().from(eventMembers).where(eq(eventMembers.eventId, eventId));
+  }
+
+  async addEventMember(member: InsertEventMemberEntity): Promise<EventMemberEntity> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    await db.insert(eventMembers).values({
+      id,
+      eventId: member.eventId,
+      operatorId: member.operatorId,
+      createdAt: now,
+    });
+    const result = await db.select().from(eventMembers).where(eq(eventMembers.id, id)).limit(1);
+    return result[0]!;
+  }
+
+  async removeEventMember(eventId: string, operatorId: string): Promise<boolean> {
+    await db.delete(eventMembers).where(and(eq(eventMembers.eventId, eventId), eq(eventMembers.operatorId, operatorId)));
     return true;
   }
 }

@@ -30,7 +30,7 @@ import { Loader2 } from "lucide-react";
 import type { Operator } from "@shared/schema";
 
 const operatorFormSchema = z.object({
-  name: z.string().min(1, "Operator name is required"),
+  name: z.string().min(1, "Team member name is required"),
   initials: z.string().min(1, "Initials are required").max(3, "Maximum 3 characters"),
   shift: z.string().min(1, "Shift is required"),
 });
@@ -59,7 +59,7 @@ export function OperatorDialog({
     defaultValues: {
       name: "",
       initials: "",
-      shift: "Day",
+      shift: "Days",
     },
   });
 
@@ -75,7 +75,7 @@ export function OperatorDialog({
         form.reset({
           name: "",
           initials: "",
-          shift: "Day",
+          shift: "Days",
         });
       }
     }
@@ -90,12 +90,12 @@ export function OperatorDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle data-testid="dialog-title-operator">
-            {isEditing ? "Edit Operator" : "Add New Operator"}
+            {isEditing ? "Edit Team Member" : "Add New Team Member"}
           </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update operator details and shift assignment"
-              : "Add a new operator to your manufacturing cell"}
+              ? "Update team member details and shift assignment"
+              : "Add a new team member to your manufacturing cell"}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -151,9 +151,9 @@ export function OperatorDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Day" data-testid="option-shift-day">Day</SelectItem>
-                        <SelectItem value="Swing" data-testid="option-shift-swing">Swing</SelectItem>
-                        <SelectItem value="Night" data-testid="option-shift-night">Night</SelectItem>
+                        <SelectItem value="Days" data-testid="option-shift-day">Days</SelectItem>
+                        <SelectItem value="Afternoons" data-testid="option-shift-swing">Afternoons</SelectItem>
+                        <SelectItem value="Mids" data-testid="option-shift-night">Mids</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -173,7 +173,7 @@ export function OperatorDialog({
               </Button>
               <Button type="submit" disabled={isPending} data-testid="button-save-operator">
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? "Save Changes" : "Add Operator"}
+                {isEditing ? "Save Changes" : "Add Team Member"}
               </Button>
             </div>
           </form>

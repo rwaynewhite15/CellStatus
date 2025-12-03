@@ -23,15 +23,42 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(buildUrl(url), {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  // Simple retry with backoff for transient errors (e.g., 429 rate limit)
+  const maxAttempts = 3;
+  let attempt = 0;
+  let lastError: Error | null = null;
+  while (attempt < maxAttempts) {
+    const res = await fetch(buildUrl(url), {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+      cache: "no-store",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    if (res.ok) {
+      return res;
+    }
+
+    const isRateLimit = res.status === 429;
+    const isServerError = res.status >= 500;
+    const shouldRetry = isRateLimit || isServerError;
+
+    const text = (await res.text()) || res.statusText;
+    lastError = new Error(`${res.status}: ${text}`);
+
+    if (!shouldRetry) {
+      // Non-retryable error
+      throw lastError;
+    }
+
+    attempt += 1;
+    const backoffMs = attempt * 400; // linear backoff: 400ms, 800ms
+    await new Promise((r) => setTimeout(r, backoffMs));
+  }
+
+  if (lastError) throw lastError;
+  throw new Error("Request failed");
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -42,6 +69,8 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(buildUrl(queryKey.join("/") as string), {
       credentials: "include",
+      cache: "no-store",
+      headers: { "Pragma": "no-cache", "Cache-Control": "no-store" },
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

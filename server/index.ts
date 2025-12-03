@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -98,7 +99,89 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  async function ensureTables() {
+    try {
+      // Check if downtime_logs table exists; create if missing
+      const check = await pool.query("SELECT to_regclass('public.downtime_logs') AS exists");
+      const exists = check.rows?.[0]?.exists;
+      if (!exists) {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS downtime_logs (
+            id varchar PRIMARY KEY,
+            machine_id varchar NOT NULL,
+            reason_code text NOT NULL,
+            reason_category text NOT NULL,
+            description text,
+            start_time text NOT NULL,
+            end_time text,
+            duration integer,
+            reported_by text,
+            resolved_by text,
+            created_at text NOT NULL
+          );
+        `);
+        log("created table downtime_logs", "db");
+      }
+
+      // Ensure events tables exist
+      const checkEvents = await pool.query("SELECT to_regclass('public.events') AS exists");
+      const eventsExists = checkEvents.rows?.[0]?.exists;
+      if (!eventsExists) {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS events (
+            id varchar PRIMARY KEY,
+            title text NOT NULL,
+            description text,
+            start_date text,
+            end_date text,
+            created_at text NOT NULL,
+            updated_at text NOT NULL,
+            created_by varchar
+          );
+        `);
+        log("created table events", "db");
+      }
+
+      const checkEventTasks = await pool.query("SELECT to_regclass('public.event_tasks') AS exists");
+      const eventTasksExists = checkEventTasks.rows?.[0]?.exists;
+      if (!eventTasksExists) {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS event_tasks (
+            id varchar PRIMARY KEY,
+            event_id varchar NOT NULL,
+            title text NOT NULL,
+            description text,
+            start_date text,
+            end_date text,
+            status text,
+            assignee_id varchar,
+            created_at text NOT NULL,
+            updated_at text NOT NULL
+          );
+        `);
+        log("created table event_tasks", "db");
+      }
+
+      const checkEventMembers = await pool.query("SELECT to_regclass('public.event_members') AS exists");
+      const eventMembersExists = checkEventMembers.rows?.[0]?.exists;
+      if (!eventMembersExists) {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS event_members (
+            id varchar PRIMARY KEY,
+            event_id varchar NOT NULL,
+            operator_id varchar NOT NULL,
+            created_at text NOT NULL
+          );
+        `);
+        log("created table event_members", "db");
+      }
+    } catch (err) {
+      console.error("Failed to ensure tables:", err);
+    }
+  }
+
   try {
+    await ensureTables();
     await registerRoutes(httpServer, app);
   } catch (err) {
     console.error("Failed to register routes:", err);

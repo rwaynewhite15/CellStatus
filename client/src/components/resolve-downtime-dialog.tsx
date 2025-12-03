@@ -28,7 +28,10 @@ const resolveFormSchema = z.object({
   endTime: z.string().min(1, "End time is required"),
   resolvedBy: z.string().optional(),
   description: z.string().optional(),
-});
+}).refine(
+  (data) => new Date(data.endTime).getTime() <= Date.now(),
+  { message: "End time cannot be in the future", path: ["endTime"] }
+);
 
 type ResolveFormValues = z.infer<typeof resolveFormSchema>;
 

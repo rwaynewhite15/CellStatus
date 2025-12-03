@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertMachineSchema, insertOperatorSchema, insertMaintenanceLogSchema, insertDowntimeLogSchema, machineStatuses, users } from "@shared/schema";
+import { insertMachineSchema, insertOperatorSchema, insertMaintenanceLogSchema, insertDowntimeLogSchema, insertEventSchema, insertEventTaskSchema, insertEventMemberSchema, machineStatuses, users } from "@shared/schema";
 import { db } from "./db";
 import { z } from "zod";
 
@@ -296,6 +296,84 @@ export async function registerRoutes(
     }
   });
 
+  // === DOWNTIME LOGS ===
+
+  // Get all downtime logs
+  app.get("/api/downtime", async (_req, res) => {
+    try {
+      const logs = await storage.getDowntimeLogs();
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch downtime logs" });
+    }
+  });
+
+  // Get active downtime logs (no endTime)
+  app.get("/api/downtime/active", async (_req, res) => {
+    try {
+      const logs = await storage.getActiveDowntimeLogs();
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch active downtime logs" });
+    }
+  });
+
+  // Get downtime logs by machine
+  app.get("/api/downtime/machine/:machineId", async (req, res) => {
+    try {
+      const logs = await storage.getDowntimeLogsByMachine(req.params.machineId);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch downtime logs" });
+    }
+  });
+
+  // Create downtime log
+  app.post("/api/downtime", async (req, res) => {
+    try {
+      const { insertDowntimeLogSchema } = await import("@shared/schema");
+      const validated = insertDowntimeLogSchema.parse(req.body);
+      const log = await storage.createDowntimeLog(validated);
+      res.status(201).json(log);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid downtime log data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create downtime log" });
+    }
+  });
+
+  // Update downtime log (e.g., resolve by setting endTime)
+  app.patch("/api/downtime/:id", async (req, res) => {
+    try {
+      const partialSchema = (await import("@shared/schema")).insertDowntimeLogSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const updated = await storage.updateDowntimeLog(req.params.id, validated);
+      if (!updated) {
+        return res.status(404).json({ error: "Downtime log not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid downtime update", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update downtime log" });
+    }
+  });
+
+  // Delete downtime log
+  app.delete("/api/downtime/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteDowntimeLog(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Downtime log not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete downtime log" });
+    }
+  });
+
   // === PRODUCTION STATS ===
 
   // Get all production stats
@@ -323,7 +401,12 @@ export async function registerRoutes(
     try {
       const { insertProductionStatSchema } = await import("@shared/schema");
       const validatedData = insertProductionStatSchema.parse(req.body);
-      const operatorId = req.operatorId;
+      // Prefer the operator currently assigned to the machine; fall back to authenticated user
+      let operatorId = req.operatorId as string | undefined;
+      try {
+        const m = await storage.getMachine(validatedData.machineId);
+        if (m?.operatorId) operatorId = m.operatorId;
+      } catch {}
       const stat = await storage.createProductionStat(validatedData, operatorId);
       res.status(201).json(stat);
     } catch (error) {
@@ -351,6 +434,7 @@ export async function registerRoutes(
   app.delete("/api/production-stats/by-date", async (req, res) => {
     try {
       const { machineId, date, shift } = req.query as Record<string, string | undefined>;
+      console.log("Delete request:", { machineId, date, shift });
       if (!machineId || !date) {
         return res.status(400).json({ error: "machineId and date are required" });
       }
@@ -360,8 +444,10 @@ export async function registerRoutes(
       const deleted = shift
         ? await storage.deleteProductionStatsByMachineDateShift(machineId, date, shift)
         : await storage.deleteProductionStatsByMachineAndDate(machineId, date);
+      console.log("Deleted count:", deleted);
       res.json({ deleted });
     } catch (error) {
+      console.error("Delete error:", error);
       res.status(500).json({ error: "Failed to bulk delete production stats" });
     }
   });
@@ -874,5 +960,147 @@ export async function registerRoutes(
     }
   });
 
+  // Register Events routes
+  registerEventRoutes(app);
   return httpServer;
+}
+
+// === EVENTS ROUTES ===
+export function registerEventRoutes(app: Express) {
+  // Events CRUD
+  app.get("/api/events", async (_req, res) => {
+    try {
+      const events = await storage.getEvents();
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
+  app.get("/api/events/:id", async (req, res) => {
+    try {
+      const event = await storage.getEvent(req.params.id);
+      if (!event) return res.status(404).json({ error: "Event not found" });
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch event" });
+    }
+  });
+
+  app.post("/api/events", async (req, res) => {
+    try {
+      const validated = insertEventSchema.parse(req.body);
+      const createdBy = (req as any).operatorId;
+      const event = await storage.createEvent(validated, createdBy);
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid event data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+
+  app.patch("/api/events/:id", async (req, res) => {
+    try {
+      const partial = insertEventSchema.partial();
+      const validated = partial.parse(req.body);
+      const event = await storage.updateEvent(req.params.id, validated);
+      if (!event) return res.status(404).json({ error: "Event not found" });
+      res.json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid event update", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update event" });
+    }
+  });
+
+  app.delete("/api/events/:id", async (req, res) => {
+    try {
+      const ok = await storage.deleteEvent(req.params.id);
+      res.json({ success: ok });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete event" });
+    }
+  });
+
+  // Event Tasks
+  app.get("/api/events/:id/tasks", async (req, res) => {
+    try {
+      const tasks = await storage.getEventTasks(req.params.id);
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch event tasks" });
+    }
+  });
+
+  app.post("/api/event-tasks", async (req, res) => {
+    try {
+      const validated = insertEventTaskSchema.parse(req.body);
+      const task = await storage.createEventTask(validated);
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid event task data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create event task" });
+    }
+  });
+
+  app.patch("/api/event-tasks/:id", async (req, res) => {
+    try {
+      const partial = insertEventTaskSchema.partial();
+      const validated = partial.parse(req.body);
+      const task = await storage.updateEventTask(req.params.id, validated);
+      if (!task) return res.status(404).json({ error: "Event task not found" });
+      res.json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid event task update", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update event task" });
+    }
+  });
+
+  app.delete("/api/event-tasks/:id", async (req, res) => {
+    try {
+      const ok = await storage.deleteEventTask(req.params.id);
+      res.json({ success: ok });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete event task" });
+    }
+  });
+
+  // Event Members
+  app.get("/api/events/:id/members", async (req, res) => {
+    try {
+      const members = await storage.getEventMembers(req.params.id);
+      res.json(members);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch event members" });
+    }
+  });
+
+  app.post("/api/event-members", async (req, res) => {
+    try {
+      const validated = insertEventMemberSchema.parse(req.body);
+      const member = await storage.addEventMember(validated);
+      res.status(201).json(member);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid event member data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to add event member" });
+    }
+  });
+
+  app.delete("/api/events/:id/members/:operatorId", async (req, res) => {
+    try {
+      const ok = await storage.removeEventMember(req.params.id, req.params.operatorId);
+      res.json({ success: ok });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove event member" });
+    }
+  });
 }

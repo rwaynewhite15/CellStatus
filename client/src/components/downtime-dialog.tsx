@@ -37,7 +37,10 @@ const downtimeFormSchema = z.object({
   reasonCode: z.string().min(1, "Reason code is required"),
   description: z.string().optional(),
   reportedBy: z.string().optional(),
-  startTime: z.string().min(1, "Start time is required"),
+  startTime: z.string().min(1, "Start time is required").refine(
+    (val) => new Date(val).getTime() <= Date.now(),
+    { message: "Start time cannot be in the future" }
+  ),
 });
 
 type DowntimeFormValues = z.infer<typeof downtimeFormSchema>;

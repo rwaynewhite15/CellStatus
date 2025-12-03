@@ -49,6 +49,7 @@ export default function Dashboard() {
 
   const { data: productionStats = [] } = useQuery<ProductionStat[]>({
     queryKey: ["/api/production-stats"],
+    staleTime: 0,
   });
 
   const { data: activeDowntime = [] } = useQuery<DowntimeLog[]>({
@@ -144,6 +145,23 @@ export default function Dashboard() {
     onError: (error) => {
       console.error("Delete stats error:", error);
       toast({ title: "Failed to delete production stats", variant: "destructive" });
+    },
+  });
+
+  // Fallback: delete by specific stat id if bulk delete fails on some setups
+  const deleteProductionStatById = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/production-stats/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/efficiency"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/machine-history"] });
+      toast({ title: "Production stat deleted" });
+    },
+    onError: (error) => {
+      console.error("Delete stat by id error:", error);
+      toast({ title: "Failed to delete production stat", variant: "destructive" });
     },
   });
 
@@ -246,7 +264,15 @@ export default function Dashboard() {
   const handleDeleteStats = (machineId: string) => {
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    deleteProductionStatsMutation.mutate({ machineId, date: today, shift: selectedShift });
+    // Try to find today's stat(s) and delete by id as a robust fallback
+    const todaysStats = productionStats.filter(s => s.machineId === machineId && s.date === today);
+    if (todaysStats.length > 0) {
+      // Delete the most recent one first
+      deleteProductionStatById.mutate(todaysStats[0].id);
+    } else {
+      // Fallback to bulk delete by date
+      deleteProductionStatsMutation.mutate({ machineId, date: today });
+    }
   };
 
   const handleMachineSubmit = (data: Record<string, unknown>) => {

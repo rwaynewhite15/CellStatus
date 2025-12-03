@@ -165,6 +165,67 @@ export const downtimeLogs = pgTable("downtime_logs", {
   createdAt: text("created_at").notNull(),
 });
 
-export const insertDowntimeLogSchema = createInsertSchema(downtimeLogs).omit({ id: true, createdAt: true });
+export const insertDowntimeLogSchema = createInsertSchema(downtimeLogs)
+  .omit({ id: true, createdAt: true })
+  .refine(
+    (data) => !data.startTime || new Date(data.startTime).getTime() <= Date.now(),
+    { message: "Start time cannot be in the future", path: ["startTime"] }
+  )
+  .refine(
+    (data) => !data.endTime || new Date(data.endTime).getTime() <= Date.now(),
+    { message: "End time cannot be in the future", path: ["endTime"] }
+  )
+  .refine(
+    (data) => {
+      if (!data.startTime || !data.endTime) return true;
+      return new Date(data.endTime).getTime() >= new Date(data.startTime).getTime();
+    },
+    { message: "End time must be after start time", path: ["endTime"] }
+  );
 export type InsertDowntimeLog = z.infer<typeof insertDowntimeLogSchema>;
 export type DowntimeLog = typeof downtimeLogs.$inferSelect;
+
+// === EVENTS ===
+
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  createdBy: varchar("created_by"),
+});
+
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type Event = typeof events.$inferSelect;
+
+export const eventTasks = pgTable("event_tasks", {
+  id: varchar("id").primaryKey(),
+  eventId: varchar("event_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  status: text("status").default("pending"),
+  assigneeId: varchar("assignee_id"), // operatorId
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertEventTaskSchema = createInsertSchema(eventTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEventTask = z.infer<typeof insertEventTaskSchema>;
+export type EventTask = typeof eventTasks.$inferSelect;
+
+export const eventMembers = pgTable("event_members", {
+  id: varchar("id").primaryKey(),
+  eventId: varchar("event_id").notNull(),
+  operatorId: varchar("operator_id").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const insertEventMemberSchema = createInsertSchema(eventMembers).omit({ id: true, createdAt: true });
+export type InsertEventMember = z.infer<typeof insertEventMemberSchema>;
+export type EventMember = typeof eventMembers.$inferSelect;

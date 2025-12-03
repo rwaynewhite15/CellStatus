@@ -14,6 +14,7 @@ import MachinesPage from "@/pages/machines";
 import OperatorsPage from "@/pages/operators";
 import MaintenancePage from "@/pages/maintenance";
 import ReportsPage from "@/pages/reports";
+import EventsPage from "@/pages/events";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
@@ -73,6 +74,7 @@ function AppContent() {
               <Route path="/operators" component={OperatorsPage} />
               <Route path="/maintenance" component={MaintenancePage} />
               <Route path="/reports" component={ReportsPage} />
+              <Route path="/events" component={EventsPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

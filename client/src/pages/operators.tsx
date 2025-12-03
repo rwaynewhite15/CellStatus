@@ -30,9 +30,9 @@ import { Plus, Pencil, Trash2, Users, Sun, Moon, Sunset } from "lucide-react";
 import type { Operator, Machine } from "@shared/schema";
 
 const shiftConfig: Record<string, { icon: typeof Sun; className: string }> = {
-  Day: { icon: Sun, className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
-  Swing: { icon: Sunset, className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
-  Night: { icon: Moon, className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400" },
+  Days: { icon: Sun, className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  Afternoons: { icon: Sunset, className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+  Mids: { icon: Moon, className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400" },
 };
 
 export default function OperatorsPage() {
@@ -55,10 +55,10 @@ export default function OperatorsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operators"] });
       setDialogOpen(false);
-      toast({ title: "Operator added successfully" });
+      toast({ title: "Team member added successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to add operator", variant: "destructive" });
+      toast({ title: "Failed to add team member", variant: "destructive" });
     },
   });
 
@@ -69,10 +69,10 @@ export default function OperatorsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/operators"] });
       setDialogOpen(false);
       setEditingOperator(null);
-      toast({ title: "Operator updated successfully" });
+      toast({ title: "Team member updated successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to update operator", variant: "destructive" });
+      toast({ title: "Failed to update team member", variant: "destructive" });
     },
   });
 
@@ -83,10 +83,10 @@ export default function OperatorsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/machines"] });
       setDeleteConfirmOpen(false);
       setDeletingOperator(null);
-      toast({ title: "Operator deleted successfully" });
+      toast({ title: "Team member deleted successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to delete operator", variant: "destructive" });
+      toast({ title: "Failed to delete team member", variant: "destructive" });
     },
   });
 
@@ -128,12 +128,12 @@ export default function OperatorsPage() {
       <div className="border-b bg-card/50 px-6 py-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold" data-testid="text-operators-title">Operators</h1>
-            <p className="text-sm text-muted-foreground">Manage machine operators and shift assignments</p>
+            <h1 className="text-2xl font-semibold" data-testid="text-operators-title">Team Members</h1>
+            <p className="text-sm text-muted-foreground">Manage team members and shift assignments</p>
           </div>
           <Button onClick={handleAdd} className="gap-2 shrink-0" data-testid="button-add-operator">
             <Plus className="h-4 w-4" />
-            Add Operator
+            Add Team Member
           </Button>
         </div>
       </div>
@@ -141,7 +141,7 @@ export default function OperatorsPage() {
       <div className="flex-1 overflow-auto p-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">All Operators</CardTitle>
+            <CardTitle className="text-lg">All Team Members</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -153,18 +153,18 @@ export default function OperatorsPage() {
             ) : operators.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="font-medium mb-1">No Operators</h3>
-                <p className="text-sm text-muted-foreground mb-4">Add operators to assign them to machines</p>
+                <h3 className="font-medium mb-1">No Team Members</h3>
+                <p className="text-sm text-muted-foreground mb-4">Add team members to assign them to machines</p>
                 <Button onClick={handleAdd} variant="outline" className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Add Operator
+                  Add Team Member
                 </Button>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Operator</TableHead>
+                    <TableHead>Team Member</TableHead>
                     <TableHead>Initials</TableHead>
                     <TableHead>Shift</TableHead>
                     <TableHead>Assigned Machine</TableHead>
@@ -252,7 +252,7 @@ export default function OperatorsPage() {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Operator</AlertDialogTitle>
+            <AlertDialogTitle>Delete Team Member</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete {deletingOperator?.name}? They will be unassigned from any machines.
             </AlertDialogDescription>
