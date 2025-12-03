@@ -6,8 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/dashboard";
 import MachinesPage from "@/pages/machines";
@@ -56,15 +54,6 @@ function AppContent() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => window.location.href = "/api/logout"}
-                title="Sign out"
-                data-testid="button-sign-out"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
             </div>
           </header>
           <main className="flex-1 overflow-hidden">
