@@ -33,6 +33,7 @@ export interface IStorage {
   updateMachine(id: string, updates: Partial<InsertMachine>, operatorId?: string): Promise<Machine | undefined>;
   updateMachineStatus(id: string, status: MachineStatus, operatorId?: string): Promise<Machine | undefined>;
   updateMachineOperator(id: string, operatorId: string | null): Promise<Machine | undefined>;
+  updateMachineStatusUpdate(id: string, statusUpdate: string, operatorId?: string): Promise<Machine | undefined>;
   deleteMachine(id: string): Promise<boolean>;
 
   // Operators
@@ -208,6 +209,23 @@ export class DatabaseStorage implements IStorage {
     await db.update(machines)
       .set({
         operatorId,
+        lastUpdated: "Just now",
+        updatedAt: now,
+        updatedBy: operatorId ?? null,
+      })
+      .where(eq(machines.id, id));
+
+    return (await this.getMachine(id))!;
+  }
+
+  async updateMachineStatusUpdate(id: string, statusUpdate: string, operatorId?: string): Promise<Machine | undefined> {
+    const machine = await this.getMachine(id);
+    if (!machine) return undefined;
+
+    const now = new Date().toISOString();
+    await db.update(machines)
+      .set({
+        statusUpdate,
         lastUpdated: "Just now",
         updatedAt: now,
         updatedBy: operatorId ?? null,

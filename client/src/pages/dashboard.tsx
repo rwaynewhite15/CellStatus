@@ -12,6 +12,7 @@ import { ResolveDowntimeDialog } from "@/components/resolve-downtime-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Input } from "@/components/ui/input";
 import { 
   Plus, 
   Play, 
@@ -22,6 +23,7 @@ import {
   TrendingUp,
   Target,
   Clock,
+  Search,
 } from "lucide-react";
 import type { Machine, Operator, MachineStatus, ProductionStat, DowntimeLog } from "@shared/schema";
 
@@ -38,6 +40,7 @@ export default function Dashboard() {
   const [downtimeMachineId, setDowntimeMachineId] = useState<string | undefined>();
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [resolvingDowntime, setResolvingDowntime] = useState<DowntimeLog | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const { data: machines = [], isLoading: machinesLoading } = useQuery<Machine[]>({
     queryKey: ["/api/machines"],
@@ -105,6 +108,18 @@ export default function Dashboard() {
     },
     onError: () => {
       toast({ title: "Failed to assign operator", variant: "destructive" });
+    },
+  });
+
+  const updateStatusUpdateMutation = useMutation({
+    mutationFn: ({ machineId, statusUpdate }: { machineId: string; statusUpdate: string }) =>
+      apiRequest("PATCH", `/api/machines/${machineId}/status-update`, { statusUpdate }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/machines"] });
+      toast({ title: "Status update saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save status update", variant: "destructive" });
     },
   });
 
@@ -287,17 +302,34 @@ export default function Dashboard() {
     assignOperatorMutation.mutate({ machineId, operatorId });
   };
 
-  // Calculate summary stats
-  const runningCount = machines.filter((m) => m.status === "running").length;
-  const idleCount = machines.filter((m) => m.status === "idle").length;
-  const maintenanceCount = machines.filter((m) => m.status === "maintenance").length;
-  const downCount = machines.filter((m) => m.status === "down").length;
-  const setupCount = machines.filter((m) => m.status === "setup").length;
+  const getOperatorById = (id: string | null) => {
+    if (!id) return undefined;
+    return operators.find((o) => o.id === id);
+  };
 
-  const totalUnits = machines.reduce((sum, m) => sum + m.unitsProduced, 0);
-  const totalTarget = machines.reduce((sum, m) => sum + m.targetUnits, 0);
-  const avgEfficiency = machines.length > 0
-    ? machines.reduce((sum, m) => sum + (m.efficiency ?? 0), 0) / machines.length
+  // Filter machines based on search query
+  const filteredMachines = machines.filter(machine => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      machine.name.toLowerCase().includes(query) ||
+      machine.machineId.toLowerCase().includes(query) ||
+      machine.status.toLowerCase().includes(query) ||
+      (getOperatorById(machine.operatorId)?.name.toLowerCase().includes(query))
+    );
+  });
+
+  // Calculate summary stats from filtered machines
+  const runningCount = filteredMachines.filter((m) => m.status === "running").length;
+  const idleCount = filteredMachines.filter((m) => m.status === "idle").length;
+  const maintenanceCount = filteredMachines.filter((m) => m.status === "maintenance").length;
+  const downCount = filteredMachines.filter((m) => m.status === "down").length;
+  const setupCount = filteredMachines.filter((m) => m.status === "setup").length;
+
+  const totalUnits = filteredMachines.reduce((sum, m) => sum + m.unitsProduced, 0);
+  const totalTarget = filteredMachines.reduce((sum, m) => sum + m.targetUnits, 0);
+  const avgEfficiency = filteredMachines.length > 0
+    ? filteredMachines.reduce((sum, m) => sum + (m.efficiency ?? 0), 0) / filteredMachines.length
     : 0;
 
   // Calculate active downtime duration
@@ -321,11 +353,6 @@ export default function Dashboard() {
     return `${minutes}m`;
   };
 
-  const getOperatorById = (id: string | null) => {
-    if (!id) return undefined;
-    return operators.find((o) => o.id === id);
-  };
-
   // Get latest production stat date for each machine
   const getLatestStatDate = (machineId: string): string | null => {
     const machineStats = productionStats
@@ -343,7 +370,18 @@ export default function Dashboard() {
             <h1 className="text-2xl font-semibold" data-testid="text-dashboard-title">Cell Dashboard</h1>
             <p className="text-sm text-muted-foreground">Real-time manufacturing cell status</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search machines..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-machines"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Shift</span>
               <Select value={selectedShift} onValueChange={(v) => setSelectedShift(v)}>
@@ -365,70 +403,70 @@ export default function Dashboard() {
         </div>
 
         {/* Summary Stats */}
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <div className="flex items-center gap-3 rounded-md bg-background p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-machine-running/10">
-              <Play className="h-5 w-5 text-machine-running" />
+        <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-running/10">
+              <Play className="h-4 w-4 text-machine-running" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-bold" data-testid="stat-running">{runningCount}</p>
-              <p className="text-xs text-muted-foreground">Running</p>
+              <p className="text-lg font-mono font-bold" data-testid="stat-running">{runningCount}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">Running</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-md bg-background p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-machine-idle/10">
-              <Pause className="h-5 w-5 text-machine-idle" />
+          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-idle/10">
+              <Pause className="h-4 w-4 text-machine-idle" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-bold" data-testid="stat-idle">{idleCount}</p>
-              <p className="text-xs text-muted-foreground">Idle</p>
+              <p className="text-lg font-mono font-bold" data-testid="stat-idle">{idleCount}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">Idle</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-md bg-background p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-machine-maintenance/10">
-              <Wrench className="h-5 w-5 text-machine-maintenance" />
+          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-maintenance/10">
+              <Wrench className="h-4 w-4 text-machine-maintenance" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-bold" data-testid="stat-maintenance">{maintenanceCount + setupCount}</p>
-              <p className="text-xs text-muted-foreground">Maint/Setup</p>
+              <p className="text-lg font-mono font-bold" data-testid="stat-maintenance">{maintenanceCount + setupCount}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">Maint</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-md bg-background p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-machine-down/10">
-              <AlertTriangle className="h-5 w-5 text-machine-down" />
+          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-down/10">
+              <AlertTriangle className="h-4 w-4 text-machine-down" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-bold" data-testid="stat-down">{downCount}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-lg font-mono font-bold" data-testid="stat-down">{downCount}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">
                 Down
                 {activeDowntime.length > 0 && (
-                  <span className="text-machine-down ml-1">
-                    ({formatDowntimeDuration(totalActiveDowntimeMinutes)} active)
+                  <span className="text-machine-down ml-0.5 text-[9px]">
+                    ({formatDowntimeDuration(totalActiveDowntimeMinutes)})
                   </span>
                 )}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-md bg-background p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-              <Target className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+              <Target className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-mono font-bold" data-testid="stat-units">
-                {totalUnits}<span className="text-sm text-muted-foreground font-normal">/{totalTarget}</span>
+              <p className="text-lg font-mono font-bold" data-testid="stat-units">
+                {totalUnits}<span className="text-xs text-muted-foreground font-normal">/{totalTarget}</span>
               </p>
-              <p className="text-xs text-muted-foreground">Units</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">Units</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-md bg-background p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-              <TrendingUp className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+              <TrendingUp className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className={`text-2xl font-mono font-bold ${avgEfficiency >= 90 ? 'text-machine-running' : avgEfficiency >= 70 ? 'text-machine-maintenance' : 'text-machine-down'}`} data-testid="stat-efficiency">
+              <p className={`text-lg font-mono font-bold ${avgEfficiency >= 90 ? 'text-machine-running' : avgEfficiency >= 70 ? 'text-machine-maintenance' : 'text-machine-down'}`} data-testid="stat-efficiency">
                 {avgEfficiency > 0 ? `${avgEfficiency.toFixed(0)}%` : "--"}
               </p>
-              <p className="text-xs text-muted-foreground">Avg Eff.</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">Avg Eff.</p>
             </div>
           </div>
         </div>
@@ -458,23 +496,34 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        ) : machines.length === 0 ? (
+        ) : filteredMachines.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-16">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-4">
-              <Settings2 className="h-10 w-10 text-muted-foreground" />
+              {searchQuery ? (
+                <Search className="h-10 w-10 text-muted-foreground" />
+              ) : (
+                <Settings2 className="h-10 w-10 text-muted-foreground" />
+              )}
             </div>
-            <h2 className="text-xl font-semibold mb-2">No Machines Yet</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              {searchQuery ? "No Machines Found" : "No Machines Yet"}
+            </h2>
             <p className="text-muted-foreground mb-6 max-w-md">
-              Add your first machine to start tracking production status and metrics
+              {searchQuery 
+                ? `No machines match "${searchQuery}". Try a different search term.`
+                : "Add your first machine to start tracking production status and metrics"
+              }
             </p>
-            <Button onClick={handleAddMachine} className="gap-2" data-testid="button-add-first-machine">
-              <Plus className="h-4 w-4" />
-              Add Your First Machine
-            </Button>
+            {!searchQuery && (
+              <Button onClick={handleAddMachine} className="gap-2" data-testid="button-add-first-machine">
+                <Plus className="h-4 w-4" />
+                Add Your First Machine
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {machines.map((machine) => {
+            {filteredMachines.map((machine) => {
               const d = new Date();
               const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
               const isSubmittedToday = productionStats.some(s => s.machineId === machine.id && s.date === today && s.shift === selectedShift);
@@ -492,9 +541,13 @@ export default function Dashboard() {
                   onEditMachine={handleEditMachine}
                   onSubmitStats={handleSubmitStats}
                   onDeleteStats={handleDeleteStats}
+                  onUpdateStatusUpdate={(machineId, statusUpdate) => 
+                    updateStatusUpdateMutation.mutate({ machineId, statusUpdate })
+                  }
                   isSubmittedToday={isSubmittedToday}
                   isPendingSubmit={submitProductionStatMutation.isPending}
                   isPendingDelete={deleteProductionStatsMutation.isPending}
+                  isPendingStatusUpdate={updateStatusUpdateMutation.isPending}
                   activeDowntime={machineDowntime}
                   onResolveDowntime={handleResolveDowntime}
                 />

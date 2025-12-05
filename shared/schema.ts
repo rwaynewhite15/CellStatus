@@ -62,6 +62,7 @@ export const machines = pgTable("machines", {
   targetUnits: integer("target_units").notNull().default(100),
   cycleTime: real("cycle_time"),
   efficiency: real("efficiency"),
+  statusUpdate: text("status_update"),
   lastUpdated: text("last_updated"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),

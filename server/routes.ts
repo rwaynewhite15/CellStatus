@@ -148,6 +148,21 @@ export async function registerRoutes(
     }
   });
 
+  // Update machine status update text
+  app.patch("/api/machines/:id/status-update", async (req, res) => {
+    try {
+      const { statusUpdate } = req.body;
+      const operatorId = req.operatorId;
+      const machine = await storage.updateMachineStatusUpdate(req.params.id, statusUpdate, operatorId);
+      if (!machine) {
+        return res.status(404).json({ error: "Machine not found" });
+      }
+      res.json(machine);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update status update" });
+    }
+  });
+
   // Delete machine
   app.delete("/api/machines/:id", async (req, res) => {
     try {

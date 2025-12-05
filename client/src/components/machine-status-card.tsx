@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { 
   Play, 
@@ -9,15 +10,14 @@ import {
   Wrench, 
   AlertTriangle, 
   Settings2,
-  Clock,
   Target,
-  TrendingUp,
   UserCircle,
   MoreVertical,
   Send,
   Trash2,
   Timer,
   CheckCircle,
+  FileText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -38,9 +38,11 @@ interface MachineStatusCardProps {
   onEditMachine: (machine: Machine) => void;
   onSubmitStats: (machineId: string) => void;
   onDeleteStats: (machineId: string) => void;
+  onUpdateStatusUpdate: (machineId: string, statusUpdate: string) => void;
   isSubmittedToday: boolean;
   isPendingSubmit: boolean;
   isPendingDelete: boolean;
+  isPendingStatusUpdate: boolean;
   activeDowntime?: DowntimeLog;
   onResolveDowntime: (downtimeLog: DowntimeLog) => void;
 }
@@ -93,18 +95,26 @@ export function MachineStatusCard({
   onEditMachine,
   onSubmitStats,
   onDeleteStats,
+  onUpdateStatusUpdate,
   isSubmittedToday,
   isPendingSubmit,
   isPendingDelete,
+  isPendingStatusUpdate,
   activeDowntime,
   onResolveDowntime,
 }: MachineStatusCardProps) {
   const status = statusConfig[machine.status];
   const StatusIcon = status.icon;
-  const efficiency = machine.efficiency ?? 0;
   const progressPercent = machine.targetUnits > 0 
     ? Math.min(100, (machine.unitsProduced / machine.targetUnits) * 100) 
     : 0;
+  
+  const [statusUpdate, setStatusUpdate] = useState(machine.statusUpdate || "");
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
+  
+  useEffect(() => {
+    setStatusUpdate(machine.statusUpdate || "");
+  }, [machine.statusUpdate]);
 
   // Live downtime counter
   const [downtimeDuration, setDowntimeDuration] = useState<string>("");
@@ -268,26 +278,39 @@ export function MachineStatusCard({
           </div>
         </div>
 
-        {/* Metrics Row */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-md bg-muted/50 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Cycle Time</span>
-            </div>
-            <p className="font-mono text-xl font-bold" data-testid={`text-cycle-time-${machine.id}`}>
-              {machine.cycleTime ? `${machine.cycleTime.toFixed(1)}s` : "--"}
-            </p>
+        {/* Status Update Section */}
+        <div className="rounded-md bg-muted/50 p-3">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <FileText className="h-3.5 w-3.5" />
+            <span>Status Update</span>
           </div>
-          <div className="rounded-md bg-muted/50 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>Efficiency</span>
-            </div>
-            <p className={`font-mono text-xl font-bold ${efficiency >= 90 ? 'text-machine-running' : efficiency >= 70 ? 'text-machine-maintenance' : 'text-machine-down'}`} data-testid={`text-efficiency-${machine.id}`}>
-              {efficiency > 0 ? `${efficiency.toFixed(0)}%` : "--"}
-            </p>
-          </div>
+          <Textarea
+            value={statusUpdate}
+            onChange={(e) => {
+              setStatusUpdate(e.target.value);
+              setIsEditingStatus(true);
+            }}
+            placeholder="Add a status update or notes about this machine..."
+            className="min-h-[80px] text-sm resize-none"
+            data-testid={`textarea-status-update-${machine.id}`}
+            disabled={isPendingStatusUpdate}
+          />
+          {isEditingStatus && statusUpdate !== (machine.statusUpdate || "") && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-2 gap-1.5"
+              onClick={() => {
+                onUpdateStatusUpdate(machine.id, statusUpdate);
+                setIsEditingStatus(false);
+              }}
+              disabled={isPendingStatusUpdate}
+              data-testid={`button-save-status-update-${machine.id}`}
+            >
+              <Send className="h-3.5 w-3.5" />
+              {isPendingStatusUpdate ? "Saving..." : "Save Update"}
+            </Button>
+          )}
         </div>
 
         {/* Quick Status Change Buttons */}
