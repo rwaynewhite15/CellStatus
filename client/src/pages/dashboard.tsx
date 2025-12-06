@@ -60,6 +60,10 @@ export default function Dashboard() {
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
+  const { data: downtimeLogs = [] } = useQuery<DowntimeLog[]>({
+    queryKey: ["/api/downtime"],
+  });
+
   const createMachineMutation = useMutation({
     mutationFn: (data: Partial<Machine>) => apiRequest("POST", "/api/machines", data),
     onSuccess: () => {
@@ -74,15 +78,16 @@ export default function Dashboard() {
 
   const updateMachineMutation = useMutation({
     mutationFn: ({ id, ...data }: Partial<Machine> & { id: string }) => 
-      apiRequest("PATCH", `/api/machines/${id}`, data),
+      apiRequest("PATCH", `/api/machines/${id}`, data).then(res => res.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/machines"] });
       setMachineDialogOpen(false);
       setEditingMachine(null);
       toast({ title: "Machine updated successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to update machine", variant: "destructive" });
+    onError: (error: any) => {
+      console.error("Update error:", error);
+      toast({ title: "Failed to update machine", description: error.message, variant: "destructive" });
     },
   });
 
@@ -229,8 +234,15 @@ export default function Dashboard() {
   };
 
   const handleEditMachine = (machine: Machine) => {
-    setEditingMachine(machine);
-    setMachineDialogOpen(true);
+    // Extract only the OEE metrics to update
+    const updateData = { 
+      id: machine.id,
+      goodPartsRan: machine.goodPartsRan,
+      scrapParts: machine.scrapParts,
+      idealCycleTime: machine.idealCycleTime,
+    };
+    console.log("Updating machine with:", updateData);
+    updateMachineMutation.mutate(updateData);
   };
 
   const handleStatusChange = (machineId: string, status: MachineStatus) => {
@@ -263,16 +275,40 @@ export default function Dashboard() {
   const handleSubmitStats = (machineId: string) => {
     const machine = machines.find((m) => m.id === machineId);
     if (!machine) return;
+    
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    
+    // Calculate total downtime for the day
+    const todayDowntime = downtimeLogs
+      .filter(dt => dt.machineId === machineId && dt.startTime.startsWith(today))
+      .reduce((sum, dt) => sum + (dt.duration || 0), 0);
+    
+    // Calculate OEE metrics
+    const totalParts = (machine.goodPartsRan || 0) + (machine.scrapParts || 0);
+    const actualRuntime = Math.max(0, 420 - (todayDowntime / 60)); // Convert downtime from minutes to subtract
+    
+    let oee = 0;
+    if (machine.idealCycleTime && actualRuntime > 0) {
+      const availability = actualRuntime / 420;
+      const performance = totalParts > 0 
+        ? ((totalParts * machine.idealCycleTime) / (actualRuntime * 60)) 
+        : 0;
+      const quality = totalParts > 0 
+        ? (machine.goodPartsRan || 0) / totalParts 
+        : 0;
+      oee = availability * performance * quality * 100;
+    }
     
     submitProductionStatMutation.mutate({
       machineId: machine.id,
       shift: selectedShift,
       date: today,
-      unitsProduced: machine.unitsProduced,
-      targetUnits: machine.targetUnits,
-      efficiency: machine.efficiency,
+      goodPartsRan: machine.goodPartsRan || 0,
+      scrapParts: machine.scrapParts || 0,
+      idealCycleTime: machine.idealCycleTime || null,
+      downtime: todayDowntime,
+      oee: oee,
     });
   };
 
@@ -325,12 +361,6 @@ export default function Dashboard() {
   const maintenanceCount = filteredMachines.filter((m) => m.status === "maintenance").length;
   const downCount = filteredMachines.filter((m) => m.status === "down").length;
   const setupCount = filteredMachines.filter((m) => m.status === "setup").length;
-
-  const totalUnits = filteredMachines.reduce((sum, m) => sum + m.unitsProduced, 0);
-  const totalTarget = filteredMachines.reduce((sum, m) => sum + m.targetUnits, 0);
-  const avgEfficiency = filteredMachines.length > 0
-    ? filteredMachines.reduce((sum, m) => sum + (m.efficiency ?? 0), 0) / filteredMachines.length
-    : 0;
 
   // Calculate active downtime duration
   const getActiveDowntimeForMachine = (machineId: string) => {
@@ -403,8 +433,8 @@ export default function Dashboard() {
         </div>
 
         {/* Summary Stats */}
-        <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
-          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+        <div className="mt-3 grid grid-cols-4 gap-3">
+          <div className="flex items-center gap-2 rounded-md bg-background p-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-running/10">
               <Play className="h-4 w-4 text-machine-running" />
             </div>
@@ -413,7 +443,7 @@ export default function Dashboard() {
               <p className="text-[10px] text-muted-foreground leading-tight">Running</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+          <div className="flex items-center gap-2 rounded-md bg-background p-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-idle/10">
               <Pause className="h-4 w-4 text-machine-idle" />
             </div>
@@ -422,7 +452,7 @@ export default function Dashboard() {
               <p className="text-[10px] text-muted-foreground leading-tight">Idle</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+          <div className="flex items-center gap-2 rounded-md bg-background p-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-maintenance/10">
               <Wrench className="h-4 w-4 text-machine-maintenance" />
             </div>
@@ -431,7 +461,7 @@ export default function Dashboard() {
               <p className="text-[10px] text-muted-foreground leading-tight">Maint</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-md bg-background p-2">
+          <div className="flex items-center gap-2 rounded-md bg-background p-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-machine-down/10">
               <AlertTriangle className="h-4 w-4 text-machine-down" />
             </div>
@@ -445,28 +475,6 @@ export default function Dashboard() {
                   </span>
                 )}
               </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-md bg-background p-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-              <Target className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className="text-lg font-mono font-bold" data-testid="stat-units">
-                {totalUnits}<span className="text-xs text-muted-foreground font-normal">/{totalTarget}</span>
-              </p>
-              <p className="text-[10px] text-muted-foreground leading-tight">Units</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-md bg-background p-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className={`text-lg font-mono font-bold ${avgEfficiency >= 90 ? 'text-machine-running' : avgEfficiency >= 70 ? 'text-machine-maintenance' : 'text-machine-down'}`} data-testid="stat-efficiency">
-                {avgEfficiency > 0 ? `${avgEfficiency.toFixed(0)}%` : "--"}
-              </p>
-              <p className="text-[10px] text-muted-foreground leading-tight">Avg Eff.</p>
             </div>
           </div>
         </div>
@@ -534,6 +542,7 @@ export default function Dashboard() {
                   key={machine.id}
                   machine={machine}
                   operator={getOperatorById(machine.operatorId)}
+                  downtimeLogs={downtimeLogs}
                   onStatusChange={handleStatusChange}
                   onAssignOperator={handleAssignOperator}
                   onLogMaintenance={handleLogMaintenance}

@@ -100,15 +100,19 @@ export async function registerRoutes(
   // Update machine
   app.patch("/api/machines/:id", async (req, res) => {
     try {
+      console.log("PATCH /api/machines/:id - Received data:", req.body);
       const partialSchema = insertMachineSchema.partial();
       const validatedData = partialSchema.parse(req.body);
+      console.log("Validated data:", validatedData);
       const operatorId = req.operatorId;
       const machine = await storage.updateMachine(req.params.id, validatedData, operatorId);
+      console.log("Updated machine:", machine);
       if (!machine) {
         return res.status(404).json({ error: "Machine not found" });
       }
       res.json(machine);
     } catch (error) {
+      console.error("Update error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid machine data", details: error.errors });
       }
