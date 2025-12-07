@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,31 @@ import {
 } from "lucide-react";
 import type { Machine, Operator, MachineStatus, ProductionStat, DowntimeLog } from "@shared/schema";
 import { calculateOEEStats } from "@/lib/oeeUtils";
+
+// Helper to get EST time
+function getESTDate() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+}
+
+// Shift schedule
+const shiftTimes = [
+  { name: "Day", start: "06:30", end: "14:30" },
+  { name: "Evening", start: "14:30", end: "22:30" },
+  { name: "Night", start: "22:30", end: "06:30" },
+];
+
+function getCurrentShift(estTime) {
+  const hours = estTime.getHours();
+  const minutes = estTime.getMinutes();
+  const timeNum = hours * 60 + minutes;
+  const dayStart = 6 * 60 + 30;
+  const eveningStart = 14 * 60 + 30;
+  const nightStart = 22 * 60 + 30;
+  if (timeNum >= dayStart && timeNum < eveningStart) return shiftTimes[0];
+  if (timeNum >= eveningStart && timeNum < nightStart) return shiftTimes[1];
+  // Night shift wraps to next day
+  return shiftTimes[2];
+}
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -394,6 +419,35 @@ export default function Dashboard() {
     return machineStats.length > 0 ? machineStats[0].date : null;
   };
 
+  // Live EST clock
+  const [estTime, setEstTime] = useState(getESTDate());
+  useEffect(() => {
+    const interval = setInterval(() => setEstTime(getESTDate()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Planned runtime calculation for current shift
+  const currentShift = getCurrentShift(estTime);
+  // Get today's date string in EST
+  const todayStr = estTime.toISOString().slice(0, 10);
+  // Get shift start datetime
+  let shiftStartDate = new Date(todayStr + 'T' + currentShift.start + ':00-05:00');
+  // If night shift and current time is before 6:30am, shift started yesterday
+  if (currentShift.name === "Night" && estTime.getHours() < 6) {
+    const yesterday = new Date(estTime);
+    yesterday.setDate(estTime.getDate() - 1);
+    const ystr = yesterday.toISOString().slice(0, 10);
+    shiftStartDate = new Date(ystr + 'T22:30:00-05:00');
+  }
+  let plannedRuntimeMinutes = Math.floor((estTime.getTime() - shiftStartDate.getTime()) / 60000);
+  // Subtract 1 hour for breaks/lunch if shift has started
+  if (plannedRuntimeMinutes > 0) {
+    plannedRuntimeMinutes -= 60;
+    if (plannedRuntimeMinutes < 0) plannedRuntimeMinutes = 0;
+  } else {
+    plannedRuntimeMinutes = 0;
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header Stats */}
@@ -483,6 +537,18 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* EST Clock and Planned Runtime */}
+      <div className="flex items-center gap-8 p-4 border-b bg-muted/10">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-lg">Current Time (EST):</span>
+          <span className="font-mono text-lg" data-testid="clock-est">{estTime.toLocaleTimeString("en-US", { hour12: false })}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-lg">Planned Runtime (up to now):</span>
+          <span className="font-mono text-lg" data-testid="planned-runtime">{plannedRuntimeMinutes} min</span>
+        </div>
+      </div>
+
       {/* Machine Grid */}
       <div className="flex-1 overflow-auto p-6">
         {machinesLoading ? (
@@ -535,17 +601,24 @@ export default function Dashboard() {
         ) : (
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredMachines.map((machine) => {
-              const d = new Date();
-              const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-              const isSubmittedToday = productionStats.some(s => s.machineId === machine.id && s.date === today && s.shift === selectedShift);
+              // Calculate total downtime for this machine in current shift
+              const machineDowntimeMinutes = downtimeLogs
+                .filter(log => log.machineId === machine.id)
+                .reduce((sum, log) => sum + (log.duration || 0), 0);
+              const runtimeMinutes = Math.max(plannedRuntimeMinutes - machineDowntimeMinutes, 0);
+              // Calculate if production stats have been submitted today for this machine and shift
+              const today = estTime.toISOString().slice(0, 10);
+              const isSubmittedToday = productionStats.some(
+                s => s.machineId === machine.id && s.date === today && s.shift === selectedShift
+              );
               const machineDowntime = getActiveDowntimeForMachine(machine.id);
-              
               return (
                 <MachineStatusCard
                   key={machine.id}
                   machine={machine}
                   operator={getOperatorById(machine.operatorId)}
                   downtimeLogs={downtimeLogs}
+                  plannedRuntimeMinutes={runtimeMinutes}
                   onStatusChange={handleStatusChange}
                   onAssignOperator={handleAssignOperator}
                   onLogMaintenance={handleLogMaintenance}

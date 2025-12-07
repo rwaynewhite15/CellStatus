@@ -169,14 +169,13 @@ export default function MachinesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Machine</TableHead>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Good Parts</TableHead>
-                    <TableHead className="text-right">Scrap Parts</TableHead>
-                    <TableHead className="text-right">Run Time (hrs)</TableHead>
-                    <TableHead className="text-right">OEE</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
+                              <TableHead>Machine</TableHead>
+                              <TableHead>ID</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">Good Parts</TableHead>
+                              <TableHead className="text-right">Scrap Parts</TableHead>
+                              <TableHead className="text-right">OEE</TableHead>
+                              <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -233,9 +232,6 @@ export default function MachinesPage() {
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {machine.scrapParts || 0}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {(actualRuntime / 60).toFixed(1)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {oee !== null ? `${oee.toFixed(1)}%` : "--"}

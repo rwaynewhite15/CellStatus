@@ -39,6 +39,7 @@ interface MachineStatusCardProps {
   machine: Machine;
   operator?: Operator;
   downtimeLogs?: DowntimeLog[];
+  plannedRuntimeMinutes?: number;
   onStatusChange: (machineId: string, status: MachineStatus) => void;
   onAssignOperator: (machineId: string) => void;
   onLogMaintenance: (machineId: string) => void;
@@ -97,6 +98,7 @@ export function MachineStatusCard({
   machine,
   operator,
   downtimeLogs = [],
+  plannedRuntimeMinutes = 0,
   onStatusChange,
   onAssignOperator,
   onLogMaintenance,
@@ -306,6 +308,11 @@ export function MachineStatusCard({
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Target className="h-4 w-4" />
               <span>OEE Metrics</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Timer className="h-4 w-4" />
+              <span>Runtime:</span>
+              <span className="font-mono font-bold" data-testid="machine-runtime">{plannedRuntimeMinutes} min</span>
             </div>
             {!editingOeeMetrics && (
               <Button

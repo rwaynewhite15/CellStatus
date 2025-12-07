@@ -101,13 +101,18 @@ export function DowntimeDialog({
 
   useEffect(() => {
     if (open) {
+      // Always set startTime to current local time when dialog opens
+      const now = new Date();
+      // Format as yyyy-MM-ddTHH:mm for datetime-local input
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
       form.reset({
         machineId: preselectedMachineId ?? "",
         reasonCategory: undefined,
         reasonCode: "",
         description: "",
         reportedBy: "",
-        startTime: new Date().toISOString().slice(0, 16),
+        startTime: local,
       });
     }
   }, [open, preselectedMachineId, form]);

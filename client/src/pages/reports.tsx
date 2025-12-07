@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,19 @@ import type {
   JobSetterActivity,
 } from "./reports.types";
 
+// Helper to get EST time
+function getESTDate() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+}
+
 export default function Reports() {
+  // Live EST clock
+  const [estTime, setEstTime] = useState(getESTDate());
+  useEffect(() => {
+    const interval = setInterval(() => setEstTime(getESTDate()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [reportTimestamp, setReportTimestamp] = useState<Date | null>(new Date());
   const { data: reportData, isLoading } = useQuery<ReportResponse>({
     queryKey: ["/api/reports/efficiency"],
@@ -92,21 +104,45 @@ export default function Reports() {
     let oees: number[] = [];
     let ps: number[] = [];
     let qs: number[] = [];
+    let as: number[] = [];
     Object.values(oeeHistory).forEach(machine => {
       const stat = machine.data.find(d => d.date === date);
       if (stat) {
         if (typeof stat.oee === 'number') oees.push(stat.oee);
         if (typeof stat.performance === 'number') ps.push(stat.performance);
         if (typeof stat.quality === 'number') qs.push(stat.quality);
+        if (typeof stat.availability === 'number') as.push(stat.availability);
       }
     });
     return {
       date,
       avgOEE: oees.length ? oees.reduce((a, b) => a + b, 0) / oees.length : null,
+      avgA: as.length ? as.reduce((a, b) => a + b, 0) / as.length : null,
       avgP: ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null,
       avgQ: qs.length ? qs.reduce((a, b) => a + b, 0) / qs.length : null,
     };
   });
+
+  // Planned production time calculation (from earliest shift start today)
+  // Assume shift start is the earliest stat.date === today
+  const todayStr = estTime.toISOString().slice(0, 10);
+  let earliestShiftStart: Date | null = null;
+  Object.values(oeeHistory).forEach(machine => {
+    const todayStats = machine.data.filter(d => d.date === todayStr);
+    if (todayStats.length > 0) {
+      // If shift info includes time, use it; else, use midnight
+      // For now, assume shift starts at midnight
+      const shiftStart = new Date(todayStr + 'T00:00:00-05:00');
+      if (!earliestShiftStart || shiftStart < earliestShiftStart) {
+        earliestShiftStart = shiftStart;
+      }
+    }
+  });
+  let plannedProductionMinutes = 0;
+  if (earliestShiftStart) {
+    plannedProductionMinutes = Math.floor((estTime.getTime() - earliestShiftStart.getTime()) / 60000);
+    if (plannedProductionMinutes < 0) plannedProductionMinutes = 0;
+  }
 
   if (isLoading || isLoadingHistory) {
     return (
@@ -185,9 +221,9 @@ export default function Reports() {
             {/* Average OEE, P, Q Trend Chart */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Average OEE, P, Q Trend</CardTitle>
+                <CardTitle className="text-lg">Average OEE, A, P, Q Trend</CardTitle>
                 <CardDescription className="text-xs">
-                  Daily average OEE (%), Performance (P), and Quality (Q) across all machines
+                  Daily average OEE (%), Availability (A), Performance (P), and Quality (Q) across all machines
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -198,6 +234,7 @@ export default function Reports() {
                     <Tooltip formatter={v => v != null ? `${v.toFixed(1)}%` : "--"} />
                     <Legend />
                     <Line type="monotone" dataKey="avgOEE" name="Avg OEE" stroke="#3b82f6" strokeWidth={3} dot />
+                    <Line type="monotone" dataKey="avgA" name="Avg A" stroke="#6366f1" strokeWidth={2} dot />
                     <Line type="monotone" dataKey="avgP" name="Avg P" stroke="#10b981" strokeWidth={2} dot />
                     <Line type="monotone" dataKey="avgQ" name="Avg Q" stroke="#f59e42" strokeWidth={2} dot />
                   </LineChart>

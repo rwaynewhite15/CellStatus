@@ -83,8 +83,12 @@ export function ResolveDowntimeDialog({
 
   useEffect(() => {
     if (open) {
+      // Use EST local time for endTime
+      const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
       form.reset({
-        endTime: new Date().toISOString().slice(0, 16),
+        endTime: local,
         resolvedBy: "",
         description: downtimeLog?.description ?? "",
       });
