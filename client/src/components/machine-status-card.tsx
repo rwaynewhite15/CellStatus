@@ -522,11 +522,20 @@ export function MachineStatusCard({
           <Button
             variant="outline"
             size="sm"
-            className="gap-1.5"
+            className="gap-1.5 mr-2"
             onClick={() => onLogMaintenance(machine.id)}
             data-testid={`button-maintenance-${machine.id}`}
           >
             <Wrench className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => onLogDowntime(machine.id)}
+            data-testid={`button-downtime-${machine.id}`}
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
           </Button>
         </div>
 

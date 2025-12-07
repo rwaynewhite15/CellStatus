@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+// ...existing code...
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import type { Machine, ProductionStat } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { calculateOEEStats } from "@/lib/oeeUtils";
+import { useQuery } from "@tanstack/react-query";
 
 export default function ProductionStats() {
   const todayLocal = useMemo(() => {
@@ -34,34 +36,79 @@ export default function ProductionStats() {
     staleTime: 0,
   });
 
+  // Fetch all downtime logs
+  const { data: downtimeLogs = [], isLoading: isLoadingDowntime } = useQuery({
+    queryKey: ["/api/downtime"],
+    staleTime: 0,
+  });
+
   const [form, setForm] = useState({
     machineId: "",
     shift: "Day",
     date: todayLocal,
-    unitsProduced: "",
-    targetUnits: "",
+    goodPartsRan: "",
+    scrapParts: "",
+    idealCycleTime: "",
     downtime: "0",
-    efficiency: "",
+    oee: "",
+    availability: "",
+    performance: "",
+    quality: "",
   });
 
   const submitStatMutation = useMutation({
     mutationFn: async () => {
+      // Find the selected machine
+      const selectedMachine = machines.find(m => m.id === form.machineId);
+
+      // Aggregate downtime for selected machine/date/shift
+      const selectedDate = form.date;
+      const selectedShift = form.shift;
+      const machineId = form.machineId;
+      // Filter downtime logs for this machine, date, and shift
+      const relevantDowntimeLogs = downtimeLogs.filter((log) => {
+        // log.machineId, log.date, log.shift must match
+        return log.machineId === machineId && log.date === selectedDate && log.shift === selectedShift;
+      });
+      const aggregatedDowntime = relevantDowntimeLogs.reduce((sum, log) => sum + (log.duration || 0), 0);
+
+      // Use aggregated downtime in OEE calculation
+      const oeeStats = calculateOEEStats({
+        plannedProductionTime: 420,
+        downtime: aggregatedDowntime,
+        goodPartsRan: Number(form.goodPartsRan || 0),
+        scrapParts: Number(form.scrapParts || 0),
+        idealCycleTime: Number(form.idealCycleTime || 0),
+      });
       const payload = {
         machineId: form.machineId,
         shift: form.shift,
         date: form.date,
-        unitsProduced: Number(form.unitsProduced || 0),
-        targetUnits: Number(form.targetUnits || 0),
-        downtime: Number(form.downtime || 0),
-        efficiency: form.efficiency === "" ? null : Number(form.efficiency),
-      } as const;
+        goodPartsRan: Number(form.goodPartsRan || 0),
+        scrapParts: Number(form.scrapParts || 0),
+        idealCycleTime: Number(form.idealCycleTime || 0),
+        downtime: aggregatedDowntime,
+        oee: oeeStats.oee,
+        availability: oeeStats.availability,
+        performance: oeeStats.performance,
+        quality: oeeStats.quality,
+      };
       await apiRequest("POST", "/api/production-stats", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/efficiency"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/machine-history"] });
-      setForm((f) => ({ ...f, unitsProduced: "", targetUnits: "", downtime: "0", efficiency: "" }));
+      setForm((f) => ({ ...f,
+        goodPartsRan: "",
+        scrapParts: "",
+        idealCycleTime: "",
+        downtime: "0",
+        oee: "",
+        availability: "",
+        performance: "",
+        quality: "",
+      }));
     },
   });
 
@@ -91,6 +138,22 @@ export default function ProductionStats() {
     );
   }
 
+  // Calculate live OEE metrics for the form
+  const selectedDate = form.date;
+  const selectedShift = form.shift;
+  const machineId = form.machineId;
+  const relevantDowntimeLogs = downtimeLogs.filter((log) => {
+    return log.machineId === machineId && log.date === selectedDate && log.shift === selectedShift;
+  });
+  const aggregatedDowntime = relevantDowntimeLogs.reduce((sum, log) => sum + (log.duration || 0), 0);
+  const oeeStats = calculateOEEStats({
+    plannedProductionTime: 420,
+    downtime: aggregatedDowntime,
+    goodPartsRan: Number(form.goodPartsRan || 0),
+    scrapParts: Number(form.scrapParts || 0),
+    idealCycleTime: Number(form.idealCycleTime || 0),
+  });
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-shrink-0 border-b p-4">
@@ -119,7 +182,9 @@ export default function ProductionStats() {
                     </SelectTrigger>
                     <SelectContent>
                       {machines.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name} <span className="text-muted-foreground text-xs font-mono">({m.machineId})</span>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -144,30 +209,46 @@ export default function ProductionStats() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <Label>Units Produced</Label>
-                  <Input type="number" inputMode="numeric" value={form.unitsProduced} onChange={(e) => setForm((f) => ({ ...f, unitsProduced: e.target.value }))} />
+                  <Label>Good Parts Ran</Label>
+                  <Input type="number" inputMode="numeric" value={form.goodPartsRan} onChange={(e) => setForm((f) => ({ ...f, goodPartsRan: e.target.value }))} />
                 </div>
                 <div className="space-y-1">
-                  <Label>Target Units</Label>
-                  <Input type="number" inputMode="numeric" value={form.targetUnits} onChange={(e) => setForm((f) => ({ ...f, targetUnits: e.target.value }))} />
+                  <Label>Scrap Parts</Label>
+                  <Input type="number" inputMode="numeric" value={form.scrapParts} onChange={(e) => setForm((f) => ({ ...f, scrapParts: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Ideal Cycle Time (sec)</Label>
+                  <Input type="number" inputMode="numeric" value={form.idealCycleTime} onChange={(e) => setForm((f) => ({ ...f, idealCycleTime: e.target.value }))} />
                 </div>
                 <div className="space-y-1">
                   <Label>Downtime (min)</Label>
-                  <Input type="number" inputMode="numeric" value={form.downtime} onChange={(e) => setForm((f) => ({ ...f, downtime: e.target.value }))} />
+                  <Input type="number" inputMode="numeric" value={aggregatedDowntime} disabled />
                 </div>
                 <div className="space-y-1">
-                  <Label>Efficiency % (optional)</Label>
-                  <Input type="number" inputMode="decimal" step="0.1" value={form.efficiency} onChange={(e) => setForm((f) => ({ ...f, efficiency: e.target.value }))} />
+                  <Label>OEE</Label>
+                  <Input type="number" inputMode="decimal" step="0.01" value={oeeStats.oee} disabled />
+                </div>
+                <div className="space-y-1">
+                  <Label>Availability</Label>
+                  <Input type="number" inputMode="decimal" step="0.01" value={oeeStats.availability} disabled />
+                </div>
+                <div className="space-y-1">
+                  <Label>Performance</Label>
+                  <Input type="number" inputMode="decimal" step="0.01" value={oeeStats.performance} disabled />
+                </div>
+                <div className="space-y-1">
+                  <Label>Quality</Label>
+                  <Input type="number" inputMode="decimal" step="0.01" value={oeeStats.quality} disabled />
                 </div>
               </div>
               <div className="flex justify-end">
                 <Button
                   onClick={() => submitStatMutation.mutate()}
                   disabled={!form.machineId || !form.date || submitStatMutation.isPending}
-                  className="gap-2"
+                  className={`gap-2${submitStatMutation.isPending ? ' opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <Plus className="h-4 w-4" />
-                  Add Entry
+                  {submitStatMutation.isPending ? 'Submitting...' : 'Add Entry'}
                 </Button>
               </div>
             </CardContent>
@@ -186,10 +267,14 @@ export default function ProductionStats() {
                       <th className="text-left py-2 px-2">Date</th>
                       <th className="text-left py-2 px-2">Machine</th>
                       <th className="text-left py-2 px-2">Shift</th>
-                      <th className="text-right py-2 px-2">Units</th>
-                      <th className="text-right py-2 px-2">Target</th>
-                      <th className="text-right py-2 px-2">Eff%</th>
+                      <th className="text-right py-2 px-2">Good Parts</th>
+                      <th className="text-right py-2 px-2">Scrap Parts</th>
+                      <th className="text-right py-2 px-2">Ideal Cycle Time</th>
                       <th className="text-right py-2 px-2">Downtime</th>
+                      <th className="text-right py-2 px-2">OEE</th>
+                      <th className="text-right py-2 px-2">Availability</th>
+                      <th className="text-right py-2 px-2">Performance</th>
+                      <th className="text-right py-2 px-2">Quality</th>
                       <th className="text-right py-2 px-2">Actions</th>
                     </tr>
                   </thead>
@@ -204,10 +289,14 @@ export default function ProductionStats() {
                             <td className="py-2 px-2 truncate">{stat.date}</td>
                             <td className="py-2 px-2 truncate">{machineName}</td>
                             <td className="py-2 px-2 truncate">{stat.shift}</td>
-                            <td className="text-right py-2 px-2 tabular-nums">{stat.unitsProduced}</td>
-                            <td className="text-right py-2 px-2 tabular-nums">{stat.targetUnits}</td>
-                            <td className="text-right py-2 px-2 tabular-nums">{stat.efficiency != null ? `${stat.efficiency.toFixed(1)}%` : "--"}</td>
+                            <td className="text-right py-2 px-2 tabular-nums">{stat.goodPartsRan}</td>
+                            <td className="text-right py-2 px-2 tabular-nums">{stat.scrapParts}</td>
+                            <td className="text-right py-2 px-2 tabular-nums">{stat.idealCycleTime}</td>
                             <td className="text-right py-2 px-2 tabular-nums">{stat.downtime ?? 0}m</td>
+                            <td className="text-right py-2 px-2 tabular-nums">{stat.oee}</td>
+                            <td className="text-right py-2 px-2 tabular-nums">{stat.availability}</td>
+                            <td className="text-right py-2 px-2 tabular-nums">{stat.performance}</td>
+                            <td className="text-right py-2 px-2 tabular-nums">{stat.quality}</td>
                             <td className="text-right py-2 px-2">
                               <Button
                                 variant="outline"

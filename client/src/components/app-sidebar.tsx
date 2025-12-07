@@ -29,11 +29,6 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Cells",
-    url: "/cells",
-    icon: Factory,
-  },
-  {
     title: "Machines",
     url: "/machines",
     icon: Factory,
@@ -62,11 +57,6 @@ const navItems = [
     title: "Downtime Incidents",
     url: "/downtime",
     icon: AlertTriangle,
-  },
-  {
-    title: "Scrap Tickets",
-    url: "/scrap",
-    icon: Trash2,
   },
   {
     title: "Reports",

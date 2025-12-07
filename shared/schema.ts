@@ -58,8 +58,6 @@ export const machines = pgTable("machines", {
   machineId: text("machine_id").notNull(),
   status: text("status").notNull().$type<MachineStatus>(),
   operatorId: varchar("operator_id"),
-  statusUpdate: text("status_update"),
-  lastUpdated: text("last_updated"),
   // OEE fields
   idealCycleTime: real("ideal_cycle_time"),
   goodPartsRan: integer("good_parts_ran").default(0),
@@ -106,6 +104,9 @@ export const productionStats = pgTable("production_stats", {
   idealCycleTime: real("ideal_cycle_time"),
   downtime: integer("downtime").default(0),
   oee: real("oee"),
+  availability: real("availability"),
+  performance: real("performance"),
+  quality: real("quality"),
   createdAt: text("created_at").notNull(),
   createdBy: varchar("created_by"),
 });

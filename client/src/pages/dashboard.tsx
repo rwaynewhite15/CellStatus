@@ -26,6 +26,7 @@ import {
   Search,
 } from "lucide-react";
 import type { Machine, Operator, MachineStatus, ProductionStat, DowntimeLog } from "@shared/schema";
+import { calculateOEEStats } from "@/lib/oeeUtils";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -275,40 +276,42 @@ export default function Dashboard() {
   const handleSubmitStats = (machineId: string) => {
     const machine = machines.find((m) => m.id === machineId);
     if (!machine) return;
-    
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    
-    // Calculate total downtime for the day
-    const todayDowntime = downtimeLogs
-      .filter(dt => dt.machineId === machineId && dt.startTime.startsWith(today))
-      .reduce((sum, dt) => sum + (dt.duration || 0), 0);
-    
-    // Calculate OEE metrics
-    const totalParts = (machine.goodPartsRan || 0) + (machine.scrapParts || 0);
-    const actualRuntime = Math.max(0, 420 - (todayDowntime / 60)); // Convert downtime from minutes to subtract
-    
-    let oee = 0;
-    if (machine.idealCycleTime && actualRuntime > 0) {
-      const availability = actualRuntime / 420;
-      const performance = totalParts > 0 
-        ? ((totalParts * machine.idealCycleTime) / (actualRuntime * 60)) 
-        : 0;
-      const quality = totalParts > 0 
-        ? (machine.goodPartsRan || 0) / totalParts 
-        : 0;
-      oee = availability * performance * quality * 100;
-    }
-    
+    // Aggregate downtime for selected machine, date, and shift
+    const relevantDowntimeLogs = downtimeLogs.filter((log) => {
+      // If downtime logs have a date/shift field, use it; else fallback to startTime
+      if (log.date && log.shift) {
+        return log.machineId === machineId && log.date === today && log.shift === selectedShift;
+      }
+      // Fallback: match by startTime date
+      return log.machineId === machineId && log.startTime.startsWith(today);
+    });
+    const aggregatedDowntime = relevantDowntimeLogs.reduce((sum, log) => sum + (log.duration || 0), 0);
+    // Calculate OEE metrics using shared logic
+    const plannedProductionTime = 420;
+    const goodPartsRan = machine.goodPartsRan || 0;
+    const scrapParts = machine.scrapParts || 0;
+    const idealCycleTime = machine.idealCycleTime || 0;
+    const oeeStats = calculateOEEStats({
+      plannedProductionTime,
+      downtime: aggregatedDowntime,
+      goodPartsRan,
+      scrapParts,
+      idealCycleTime,
+    });
     submitProductionStatMutation.mutate({
       machineId: machine.id,
       shift: selectedShift,
       date: today,
-      goodPartsRan: machine.goodPartsRan || 0,
-      scrapParts: machine.scrapParts || 0,
-      idealCycleTime: machine.idealCycleTime || null,
-      downtime: todayDowntime,
-      oee: oee,
+      goodPartsRan,
+      scrapParts,
+      idealCycleTime,
+      downtime: aggregatedDowntime,
+      oee: oeeStats.oee,
+      availability: oeeStats.availability,
+      performance: oeeStats.performance,
+      quality: oeeStats.quality,
     });
   };
 
