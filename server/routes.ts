@@ -58,6 +58,25 @@ export async function registerRoutes(
   });
 
   // === MACHINES ===
+
+  // PATCH: Update machine statusUpdate (notes field)
+  app.patch("/api/machines/:id/status-update", async (req, res) => {
+    try {
+      const { statusUpdate } = req.body;
+      const operatorId = req.operatorId;
+      if (typeof statusUpdate !== "string") {
+        return res.status(400).json({ error: "Missing or invalid statusUpdate" });
+      }
+      const machine = await storage.updateMachineStatusUpdate(req.params.id, statusUpdate, operatorId);
+      if (!machine) {
+        return res.status(404).json({ error: "Machine not found" });
+      }
+      res.json(machine);
+    } catch (error) {
+      console.error("Error updating statusUpdate:", error);
+      res.status(500).json({ error: "Failed to update statusUpdate" });
+    }
+  });
   
   // Get all machines
   app.get("/api/machines", async (_req, res) => {
@@ -158,12 +177,15 @@ export async function registerRoutes(
     try {
       const { statusUpdate } = req.body;
       const operatorId = req.operatorId;
+      console.log("PATCH /api/machines/:id/status-update", { id: req.params.id, statusUpdate });
       const machine = await storage.updateMachineStatusUpdate(req.params.id, statusUpdate, operatorId);
+      console.log("Updated machine after status update:", machine);
       if (!machine) {
         return res.status(404).json({ error: "Machine not found" });
       }
       res.json(machine);
     } catch (error) {
+      console.error("Error updating status update:", error);
       res.status(500).json({ error: "Failed to update status update" });
     }
   });

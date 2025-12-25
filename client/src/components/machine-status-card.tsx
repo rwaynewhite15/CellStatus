@@ -160,16 +160,17 @@ export function MachineStatusCard({
   
   // (OEE and related metrics now come from metrics object)
   
-  const [statusUpdate, setStatusUpdate] = useState("");
+  const [statusUpdate, setStatusUpdate] = useState(machine.statusUpdate || "");
   const [isEditingStatus, setIsEditingStatus] = useState(false);
   const [editingOeeMetrics, setEditingOeeMetrics] = useState(false);
   const [editGoodParts, setEditGoodParts] = useState(machine.goodPartsRan?.toString() || "0");
   const [editScrapParts, setEditScrapParts] = useState(machine.scrapParts?.toString() || "0");
   const [editCycleTime, setEditCycleTime] = useState(machine.idealCycleTime?.toString() || "");
   
+  // Reset statusUpdate field when machine changes
   useEffect(() => {
-    setStatusUpdate("");
-  }, [machine.id]);
+    setStatusUpdate(machine.statusUpdate || "");
+  }, [machine.id, machine.statusUpdate]);
 
   // Only reset OEE fields when starting to edit a new machine or when opening the editor
   useEffect(() => {
@@ -496,34 +497,23 @@ export function MachineStatusCard({
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
             <FileText className="h-3.5 w-3.5" />
             <span>Status Update</span>
+            {isPendingStatusUpdate && (
+              <span className="ml-2 text-xs text-primary animate-pulse">Saving...</span>
+            )}
           </div>
           <Textarea
             value={statusUpdate}
-            onChange={(e) => {
-              setStatusUpdate(e.target.value);
-              setIsEditingStatus(true);
+            onChange={(e) => setStatusUpdate(e.target.value)}
+            onBlur={() => {
+              if (statusUpdate !== machine.statusUpdate) {
+                onUpdateStatusUpdate(machine.id, statusUpdate);
+              }
             }}
             placeholder="Add a status update or notes about this machine..."
             className="min-h-[80px] text-sm resize-none"
             data-testid={`textarea-status-update-${machine.id}`}
             disabled={isPendingStatusUpdate}
           />
-          {isEditingStatus && statusUpdate !== "" && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full mt-2 gap-1.5"
-              onClick={() => {
-                onUpdateStatusUpdate(machine.id, statusUpdate);
-                setIsEditingStatus(false);
-              }}
-              disabled={isPendingStatusUpdate}
-              data-testid={`button-save-status-update-${machine.id}`}
-            >
-              <Send className="h-3.5 w-3.5" />
-              {isPendingStatusUpdate ? "Saving..." : "Save Update"}
-            </Button>
-          )}
         </div>
 
         {/* Quick Status Change Dropdown */}

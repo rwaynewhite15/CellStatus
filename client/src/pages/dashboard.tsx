@@ -142,13 +142,16 @@ export default function Dashboard() {
 
   const updateStatusUpdateMutation = useMutation({
     mutationFn: async ({ id, statusUpdate }: { id: string; statusUpdate: string }) => {
+      console.log("Sending status update mutation", { id, statusUpdate });
       return apiRequest("PATCH", `/api/machines/${id}/status-update`, { statusUpdate });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Status update mutation success, returned machine:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/machines"] });
       toast({ title: "Status update saved" });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Status update mutation error:", error);
       toast({ title: "Failed to update status", variant: "destructive" });
     },
   });

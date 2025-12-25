@@ -64,6 +64,7 @@ export const machines = pgTable("machines", {
   scrapParts: integer("scrap_parts").default(0),
   // Runtime in minutes (optional, for UPH calculation)
   runtime: integer("runtime"), // will be undefined if not set
+  statusUpdate: text("status_update"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   createdBy: varchar("created_by"),
